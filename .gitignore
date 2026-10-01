@@ -1,0 +1,6 @@
+data/
+runs/*/ckpt/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
