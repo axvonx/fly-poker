@@ -1,5 +1,5 @@
 data/
-runs/*/ckpt/
+runs/
 .venv/
 __pycache__/
 .pytest_cache/

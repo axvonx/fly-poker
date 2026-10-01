@@ -15,6 +15,8 @@ from flypoker.brain import Brain
 from flypoker.features import encode
 from flypoker.poker import BB, N_ACTIONS, Hand
 
+Z_CLIP = 5.0  # normalised readout inputs are clipped: rare-firing neurons make heavy tails
+
 
 @dataclass
 class Readout:
@@ -30,7 +32,7 @@ class Readout:
     def normalise(self, x: np.ndarray) -> np.ndarray:
         if self.mu is None:
             return x
-        return (x - self.mu) / self.sd
+        return np.clip((x - self.mu) / self.sd, -Z_CLIP, Z_CLIP)
 
     def probs(self, z: np.ndarray, mask: np.ndarray) -> np.ndarray:
         logits = z @ self.W + self.b
