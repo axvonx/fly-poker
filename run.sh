@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Train one arm forever, restarting after crashes, keeping the Mac awake while plugged in.
+# Train one arm forever, restarting after crashes, keeping the Mac (and its screen) awake.
+# caffeinate -i blocks idle sleep on battery too; closing the lid on battery still sleeps.
 #
 #   ./run.sh real [--set lr=1e-3 ...]    # extra args only apply when the run is first created
 #   FLY_OPS="--threads 3 --throttle 0" ./run.sh real   # operational flags, applied on every (re)start
@@ -21,7 +22,7 @@ while [ "$fails" -lt 5 ]; do
   fi
   start=$(date +%s)
   # shellcheck disable=SC2086
-  caffeinate -is uv run python -m flypoker.train "${args[@]}" ${FLY_OPS:-} 2>&1 | tee -a "$run.out"
+  caffeinate -dis uv run python -m flypoker.train "${args[@]}" ${FLY_OPS:-} 2>&1 | tee -a "$run.out"
   if [ $(( $(date +%s) - start )) -lt 60 ]; then fails=$((fails + 1)); else fails=0; fi
   echo "[run.sh] trainer exited at $(date); restarting in 10s (quick failures: $fails)" | tee -a "$run.out"
   sleep 10

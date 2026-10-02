@@ -1,0 +1,299 @@
+#!/usr/bin/env bash
+# fly — run the experiment: the three training arms, the booth screen, publishing to the site,
+# and banners when something stops.
+#
+#   ./fly up [arm...]        start training (default: all arms) and the watcher
+#   ./fly down [arm|display] stop them (default: everything); stopping on purpose stays quiet
+#   ./fly status             hands, speed, last log, sessions, publishing, battery
+#   ./fly display            the booth screen (flypoker.server) in tmux, opened in the browser
+#   ./fly publish            push the real fly's newest snapshots to the site now
+#   ./fly speed fast|calm [--until HH:MM]
+#                            how hard to train: fast = unthrottled, calm = 10 hands/s per arm.
+#                            With --until, the watcher switches back to calm at that time.
+#   ./fly watch [--every N] [--once]
+#                            the watcher (run by `up`): checks once a minute, alerts on stopped or
+#                            stalled runs, crash loops, low battery and a dead booth screen, and
+#                            publishes every N hands of the real arm (default 50000, or
+#                            $FLY_PUBLISH_EVERY)
+#   ./fly notify-test        send a test banner
+#
+# Sessions: tmux fly-real, fly-shuffled, fly-nobrain, fly-watch, fly-display. Each arm's speed
+# flags live in runs/<arm>/ops (operational only; a run's config.json is frozen).
+set -uo pipefail
+cd "$(dirname "$0")" || exit 1
+
+ARMS=(real shuffled nobrain)
+STATE=runs/.fly                  # watcher state: who's meant to be up, what's alerted, what's published
+STALL_SECS=600                   # no new log line for this long = stalled (lines come every ~70-200 s)
+EVERY=${FLY_PUBLISH_EVERY:-50000}
+mkdir -p "$STATE"
+
+# ── notifications ─────────────────────────────────────────────────────────────
+notify() { # title message group [sound]
+  # osascript, in the background: a stuck banner must never block the watcher. (terminal-notifier
+  # hung here waiting on a permission prompt.)
+  local t=${1//\"/\'} m=${2//\"/\'}
+  osascript -e "display notification \"$m\" with title \"$t\"${4:+ sound name \"Glass\"}" >/dev/null 2>&1 &
+  echo "$(date '+%F %T') [$3] $1: $2" >> "$STATE/notify.log"
+}
+# Alert once per condition; again only after it clears and comes back.
+alert() { # key title message
+  [ -e "$STATE/alert-$1" ] && return
+  touch "$STATE/alert-$1"
+  notify "$2" "$3" "$1" default
+}
+clear_alert() { # key title message (sent only if the alert was active)
+  [ -e "$STATE/alert-$1" ] || return
+  rm -f "$STATE/alert-$1"
+  [ $# -ge 3 ] && notify "$2" "$3" "$1"
+}
+
+# ── reading the runs ──────────────────────────────────────────────────────────
+session_up() { tmux has-session -t "=$1" 2>/dev/null; }
+meant_up() { [ -e "$STATE/up-$1" ]; }
+last_field() { # arm field -> value from the last log line ("" if none)
+  [ -f "runs/$1/log.jsonl" ] || return
+  tail -1 "runs/$1/log.jsonl" | grep -o "\"$2\": [0-9.]*" | head -1 | sed 's/.*: //'
+}
+latest_snapshot_hands() { # arm -> hands of the newest snapshot (0 if none)
+  local f last=""
+  for f in "runs/$1/snapshots"/h[0-9]*.npz; do [ -e "$f" ] && last=${f##*/}; done # globs sort by name
+  [ -n "$last" ] && echo $((10#${last:1:9})) || echo 0
+}
+log_age() { # arm -> seconds since the log (or the `up` that started it) last moved
+  local log=runs/$1/log.jsonl up=$STATE/up-$1 t=0
+  [ -f "$log" ] && t=$(stat -f %m "$log")
+  [ -f "$up" ] && [ "$(stat -f %m "$up")" -gt "$t" ] && t=$(stat -f %m "$up")
+  echo $(($(date +%s) - t))
+}
+published_hands() {
+  if [ -f "$STATE/published" ]; then cat "$STATE/published"
+  elif [ -f .publish/snapshots/manifest.json ]; then
+    python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["arms"]["real"]["snapshots"][-1]["hands"])' \
+      .publish/snapshots/manifest.json
+  else echo 0; fi
+}
+battery() { # -> "<percent> <ac|battery>"
+  local b
+  b=$(pmset -g batt)
+  printf '%s %s\n' "$(grep -o '[0-9]*%' <<<"$b" | head -1 | tr -d %)" \
+    "$(grep -q "AC Power" <<<"$b" && echo ac || echo battery)"
+}
+human() { awk -v n="$1" 'BEGIN { if (n >= 1e6) printf "%.2fM", n/1e6; else if (n >= 1e3) printf "%dk", n/1e3; else printf "%d", n }'; }
+
+# ── speed profiles: operational flags only (runs/<arm>/ops); a run's config is never touched ──
+profile_ops() { # profile arm -> flags
+  case $1-$2 in
+    fast-real|fast-shuffled) echo "${FAST_BRAIN_OPS:---kernel mps --throttle 0}" ;;
+    fast-nobrain)            echo "--throttle 0" ;;
+    calm-nobrain)            echo "--throttle 10" ;;
+    calm-*)                  echo "--kernel mps --throttle 10" ;;
+  esac
+}
+
+# ── commands ──────────────────────────────────────────────────────────────────
+ensure_watcher() {
+  session_up fly-watch || tmux new -d -s fly-watch "./fly watch"
+}
+
+cmd_up() {
+  local arms=("$@") a ops
+  [ ${#arms[@]} -eq 0 ] && arms=("${ARMS[@]}")
+  for a in "${arms[@]}"; do
+    case $a in real|shuffled|nobrain) ;; *) echo "unknown arm: $a" >&2; return 1 ;; esac
+    if [ ! -f "runs/$a/ops" ]; then
+      mkdir -p "runs/$a"
+      case $a in nobrain) echo "--throttle 28" ;; *) echo "--kernel mps --throttle 0" ;; esac > "runs/$a/ops"
+    fi
+    touch "$STATE/up-$a"
+    if session_up "fly-$a"; then
+      echo "fly-$a: already running"
+    else
+      ops=$(cat "runs/$a/ops")
+      tmux new -d -s "fly-$a" -e "FLY_OPS=$ops" "./run.sh $a"
+      echo "fly-$a: started ($ops)"
+    fi
+  done
+  ensure_watcher
+}
+
+# Rewrite each arm's flags for a profile and restart the running arms so they take effect.
+# A restart resumes from the last checkpoint (every 2,000 hands), so it costs at most ~2,000 hands.
+cmd_speed() {
+  local profile=${1:-} until="" a ops
+  case $profile in fast|calm) shift ;; *) echo "usage: ./fly speed fast|calm [--until HH:MM]" >&2; return 1 ;; esac
+  if [ "${1:-}" = --until ]; then
+    until=$(date -j -f "%H:%M" "$2" +%s 2>/dev/null) || { echo "bad time: $2" >&2; return 1; }
+    [ "$until" -le "$(date +%s)" ] && until=$((until + 86400)) # a time already past means tomorrow
+  fi
+  echo "$profile" > "$STATE/speed"
+  if [ -n "$until" ]; then echo "$until" > "$STATE/speed-until"; else rm -f "$STATE/speed-until"; fi
+  for a in "${ARMS[@]}"; do
+    ops=$(profile_ops "$profile" "$a")
+    echo "$ops" > "runs/$a/ops"
+    if session_up "fly-$a"; then
+      tmux kill-session -t "=fly-$a"
+      tmux new -d -s "fly-$a" -e "FLY_OPS=$ops" "./run.sh $a"
+      echo "fly-$a: restarted ($ops)"
+    else
+      echo "fly-$a: set to $ops"
+    fi
+  done
+  [ -n "$until" ] && echo "back to calm at $(date -r "$until" +%H:%M) (the watcher does it)"
+  ensure_watcher
+}
+
+cmd_down() {
+  local what=("$@") a
+  [ ${#what[@]} -eq 0 ] && what=("${ARMS[@]}" display watch)
+  for a in "${what[@]}"; do
+    rm -f "$STATE/up-$a" "$STATE/alert-stopped-$a" "$STATE/alert-stalled-$a"
+    session_up "fly-$a" && tmux kill-session -t "=fly-$a" && echo "fly-$a: stopped"
+  done
+  return 0
+}
+
+cmd_status() {
+  local a s hands hps age snap
+  read -r pct src < <(battery)
+  printf '%-9s %-8s %10s %8s %9s %10s\n' arm session hands hands/s last-log snapshot
+  for a in "${ARMS[@]}"; do
+    if session_up "fly-$a"; then s=up; elif meant_up "$a"; then s=DOWN; else s=off; fi
+    hands=$(last_field "$a" hands); hps=$(last_field "$a" hands_per_sec)
+    age=$(log_age "$a"); snap=$(latest_snapshot_hands "$a")
+    printf '%-9s %-8s %10s %8.1f %8ss %10s\n' "$a" "$s" "$(human "${hands:-0}")" "${hps:-0}" "$age" "$(human "$snap")"
+  done
+  if session_up fly-display; then s=up; elif meant_up display; then s=DOWN; else s=off; fi
+  local speed until=""
+  speed=$(cat "$STATE/speed" 2>/dev/null || echo custom)
+  [ -f "$STATE/speed-until" ] && until=" until $(date -r "$(cat "$STATE/speed-until")" +%H:%M)"
+  printf '\nspeed: %s%s\n' "$speed" "$until"
+  printf 'booth screen: %s   watcher: %s   published: %s (every %s)   battery: %s%% on %s\n' \
+    "$s" "$(session_up fly-watch && echo up || echo off)" "$(human "$(published_hands)")" "$(human "$EVERY")" "$pct" "$src"
+}
+
+cmd_display() {
+  [ -f web/dist/fair.html ] || (cd web && pnpm build >/dev/null) || { echo "web build failed" >&2; return 1; }
+  touch "$STATE/up-display"
+  session_up fly-display || tmux new -d -s fly-display "uv run python -m flypoker.server"
+  for _ in $(seq 60); do curl -s -o /dev/null http://localhost:8765/ && break; sleep 1; done
+  open http://localhost:8765/
+  ensure_watcher
+}
+
+cmd_publish() {
+  mkdir "$STATE/publish.lock" 2>/dev/null || { echo "a publish is already running"; return 0; }
+  trap 'rmdir "$STATE/publish.lock" 2>/dev/null' RETURN
+  if [ ! -d .publish ]; then
+    git fetch -q origin site-data && git worktree add -q .publish site-data || return 1
+  fi
+  local hands
+  hands=$(latest_snapshot_hands real)
+  rm -rf .publish/snapshots # the export only writes the current picks; start clean
+  uv run python tools/export_snapshots.py --arms real --out .publish/snapshots >/dev/null || return 1
+  (
+    cd .publish || exit 1
+    git add -A
+    git diff --cached --quiet && { echo "nothing new to publish"; exit 2; }
+    git commit -q --amend -m "Site data: the real fly's snapshots through hand $hands" &&
+      git push -q -f origin site-data &&
+      gh workflow run pages.yml --ref main >/dev/null
+  )
+  case $? in
+    0) echo "$hands" > "$STATE/published"
+       notify "The fly is updating online" "Published the fly at $(human "$hands") hands; the site redeploys in ~2 min." publish
+       echo "published $hands hands" ;;
+    2) echo "$hands" > "$STATE/published" ;;
+    *) alert publish-failed "Publishing the fly failed" "Couldn't push site-data or start the deploy. Run ./fly publish to see why."
+       return 1 ;;
+  esac
+  clear_alert publish-failed
+}
+
+watch_once() {
+  local a age pct src n file key
+  for a in "${ARMS[@]}"; do
+    meant_up "$a" || continue
+    if ! session_up "fly-$a"; then
+      alert "stopped-$a" "The fly stopped: $a" "Its tmux session is gone. Restart it with ./fly up $a"
+    elif [ "$(log_age "$a")" -gt "$STALL_SECS" ]; then
+      alert "stalled-$a" "The fly stalled: $a" "No training progress for $(( $(log_age "$a") / 60 )) min."
+    else
+      clear_alert "stopped-$a" "The fly is training again" "$a is back."
+      clear_alert "stalled-$a" "The fly is training again" "$a is making progress."
+    fi
+    # run.sh restarts and crash loops, from its output
+    file=runs/$a.out
+    [ -f "$file" ] || continue
+    for key in restarting "giving up"; do
+      n=$(grep -c "\[run.sh\].*$key" "$file")
+      local seen="$STATE/count-$a-${key// /-}"
+      if [ -f "$seen" ] && [ "$n" -gt "$(cat "$seen")" ]; then
+        if [ "$key" = restarting ]; then
+          notify "The fly restarted: $a" "Its trainer exited and run.sh restarted it (from the last checkpoint)." "restart-$a"
+        else
+          rm -f "$STATE/alert-crashloop-$a"
+          alert "crashloop-$a" "The fly crashed: $a" "Crash loop; run.sh gave up. See runs/$a.out"
+        fi
+      fi
+      echo "$n" > "$seen"
+    done
+  done
+
+  if meant_up display; then
+    if session_up fly-display; then clear_alert display-down "Booth screen is back" "fly-display is running."
+    else alert display-down "Booth screen is down" "Restart it with ./fly display"; fi
+  fi
+
+  if [ -f "$STATE/speed-until" ] && [ "$(date +%s)" -ge "$(cat "$STATE/speed-until")" ]; then
+    cmd_speed calm >/dev/null
+    notify "Training calmed down" "Back to the calm speed, as scheduled." speed
+  fi
+
+  read -r pct src < <(battery)
+  if [ "$src" = battery ] && [ -n "$pct" ]; then
+    [ "$pct" -le 20 ] && alert battery-20 "Battery at $pct%" "Training is running on battery. Plug in to keep it going."
+    [ "$pct" -le 10 ] && alert battery-10 "Battery at $pct%" "The Mac will sleep soon and training will stop."
+  else
+    rm -f "$STATE/alert-battery-20" "$STATE/alert-battery-10"
+  fi
+
+  # Publish every EVERY hands of the real fly.
+  if [ "$(latest_snapshot_hands real)" -ge $(( $(published_hands) + EVERY )) ]; then
+    cmd_publish >/dev/null
+  fi
+
+  # Did the last deploy fail? Alert once per failed run.
+  local last
+  last=$(gh run list --repo axvonx/fly-poker --workflow pages.yml --limit 1 \
+    --json databaseId,status,conclusion --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"' 2>/dev/null)
+  if [[ $last == *" completed failure" ]] && [ "$(cat "$STATE/deploy-alerted" 2>/dev/null)" != "${last%% *}" ]; then
+    echo "${last%% *}" > "$STATE/deploy-alerted"
+    notify "The site's deploy failed" "Pages run ${last%% *} failed: gh run view ${last%% *} --repo axvonx/fly-poker" deploy default
+  fi
+}
+
+cmd_watch() {
+  local once=0 i
+  while [ $# -gt 0 ]; do
+    case $1 in --every) EVERY=$2; shift 2 ;; --once) once=1; shift ;; *) echo "unknown: $1" >&2; return 1 ;; esac
+  done
+  echo "watching every 60 s; publishing every $EVERY hands of the real fly"
+  for ((i = 0; i < 100000; i++)); do # ~69 days at one check a minute, then stop
+    watch_once
+    [ "$once" -eq 1 ] && return 0
+    sleep 60
+  done
+}
+
+case ${1:-status} in
+  up) shift; cmd_up "$@" ;;
+  down) shift; cmd_down "$@" ;;
+  status) cmd_status ;;
+  display) cmd_display ;;
+  publish) cmd_publish ;;
+  speed) shift; cmd_speed "$@" ;;
+  watch) shift; cmd_watch "$@" ;;
+  notify-test) notify "The fly" "Notifications work. You'll see these when a run stops." test default ;;
+  *) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

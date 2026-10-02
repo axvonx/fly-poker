@@ -14,3 +14,5 @@ web/dist/
 *.bin
 .lavish/
 .claude/
+.publish/
+web/public/snapshots/

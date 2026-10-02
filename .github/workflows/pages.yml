@@ -3,7 +3,8 @@
 # The packed connectomes and neuron positions are too big to belong in git. They live as assets on
 # the GitHub Release tagged data-v1 (made once from tools/pack_connectome.py and
 # tools/export_site_data.py output) and are copied into
-# the site at deploy time. Readout snapshots (web/public/snapshots, small) come from the repo.
+# the site at deploy time. Readout snapshots come from the site-data branch, which ./fly publish
+# force-pushes and then dispatches this workflow (a push there can't trigger it: no workflow file).
 
 name: pages
 
@@ -42,6 +43,11 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - name: Fetch published snapshots (the site-data branch, force-pushed by ./fly publish)
+        run: |
+          git fetch --depth 1 origin site-data
+          git archive FETCH_HEAD snapshots | tar -x -C public
+          ls public/snapshots
       - name: Fetch packed connectomes
         env:
           GH_TOKEN: ${{ github.token }}

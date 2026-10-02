@@ -1,6 +1,6 @@
 """Copy a log-spaced subset of each arm's readout snapshots into the site.
 
-    uv run python tools/export_snapshots.py [--runs DIR] [--out DIR] [--points N]
+    uv run python tools/export_snapshots.py [--runs DIR] [--out DIR] [--points N] [--arms real ...]
 
 Writes web/public/snapshots/<arm>/h<hands>.f32, manifest.json, and training.json (the real fly's
 training log, for the page's chart). Each .f32 is
@@ -44,9 +44,10 @@ def main() -> None:
     ap.add_argument("--runs", type=Path, default=ROOT / "runs")
     ap.add_argument("--out", type=Path, default=ROOT / "web" / "public" / "snapshots")
     ap.add_argument("--points", type=int, default=12, help="log-spaced targets per arm")
+    ap.add_argument("--arms", nargs="+", choices=ARMS, default=list(ARMS), help="which arms to export")
     args = ap.parse_args()
     manifest = {"generated": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "arms": {}}
-    for arm in ARMS:
+    for arm in args.arms:
         snaps = {int(p.stem[1:]): p for p in (args.runs / arm / "snapshots").glob("h*.npz")}
         if not snaps:
             continue

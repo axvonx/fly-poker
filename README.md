@@ -10,40 +10,49 @@ Controls: `shuffled` (same neurons and synapse counts, targets randomly rewired)
 
 All commands run from the repo root. First time here? See [One-time setup](#one-time-setup).
 
-## Resume training
+## Running it: `./fly`
 
-Each arm runs in its own tmux session, `fly-<arm>`. `run.sh` resumes from `runs/<arm>/ckpt/latest.npz`
-and restarts the trainer if it crashes. Use the same operational flags as the last launch (they are
-recorded in each `log.jsonl` line):
+One script runs the experiment. Each arm trains in its own tmux session (`fly-real`, `fly-shuffled`,
+`fly-nobrain`), and a watcher (`fly-watch`) keeps an eye on everything.
 
-    FLY_OPS="--kernel mps --throttle 0" tmux new -d -s fly-real     './run.sh real'
-    FLY_OPS="--kernel mps --throttle 0" tmux new -d -s fly-shuffled './run.sh shuffled'
-    FLY_OPS="--throttle 28"             tmux new -d -s fly-nobrain  './run.sh nobrain'
+    ./fly up                    # start (or resume) all three arms and the watcher
+    ./fly status                # hands, speed, last log, snapshot, booth screen, publishing, battery
+    ./fly down                  # stop everything, on purpose (no alerts)
+    ./fly up real               # or one arm at a time; ./fly down nobrain
+    ./fly speed fast --until 15:00   # train flat out, then back to calm at 3 PM
+    ./fly speed calm            # 10 hands/s per arm: the machine stays usable
+    ./fly display               # the booth screen, in tmux fly-display, opened in the browser
+    ./fly publish               # push the real fly's newest snapshots to the site now
 
-`nobrain` has no connectome to run, so it gets no kernel flag. It is throttled to roughly match the
-~28 hands/s of the other two arms.
+`run.sh` resumes from `runs/<arm>/ckpt/latest.npz` and restarts a crashed trainer. A resume goes back
+to the last checkpoint (every 2,000 hands); log lines after it are dropped and the RNG state is
+restored, so nothing is double-counted.
 
-Check that the trainers came back up:
+**The watcher** checks once a minute and sends a macOS banner when:
+- a run stops (its session is gone), stalls (no log line for 10 minutes), restarts, or crash-loops;
+- the booth screen dies while it's meant to be up;
+- the battery reaches 20% or 10% while unplugged;
+- it publishes to the site (every 50,000 hands of the real arm; `./fly watch --every N`, or
+  `FLY_PUBLISH_EVERY`), or a publish or deploy fails.
 
-    tmux ls | grep fly-                      # three sessions
-    tail -3 runs/real.out                    # should say "resumed at N hands"
-    pmset -g assertions | grep caffeinate    # Mac is being kept awake
+Stopping with `./fly down` is quiet; anything else that stops a run is an alert. Banners are also
+logged to `runs/.fly/notify.log`.
 
-A resume goes back to the last checkpoint (taken every 2,000 hands). Log lines written after that
-checkpoint are dropped, and the RNG state is restored, so nothing is double-counted.
+**Battery:** training keeps going unplugged (`caffeinate -dis` blocks idle sleep and keeps the
+screen on), but **closing the lid on battery sleeps the Mac** and pauses training.
 
-## Everyday commands
-
-    # progress: hands played and speed, per arm
-    for a in real shuffled nobrain; do printf '%-9s' $a; tail -1 runs/$a/log.jsonl | cut -d, -f1,3; done
+Each arm's speed flags live in `runs/<arm>/ops` (written by `./fly up` and `./fly speed`).
 
     tail -f runs/real.out                    # live trainer output (crashes, restarts)
     tmux attach -t fly-real                  # watch a session; detach with Ctrl-b d
-    tmux kill-session -t fly-real            # stop an arm (safe: checkpoints are written atomically)
 
-To stop everything: `for a in real shuffled nobrain; do tmux kill-session -t fly-$a; done`.
+### Fair day
 
-### Operational flags (`FLY_OPS`, re-read on every restart)
+    ./fly up && ./fly display   # train, and put the booth screen up (it plays the newest snapshot)
+
+Keep the lid open. If a banner says a run stopped, `./fly up <arm>` brings it back.
+
+### Operational flags (`runs/<arm>/ops`, re-read on every restart)
 
 | Flag | Effect |
 |---|---|
@@ -110,8 +119,9 @@ Open `/fair.html` on the Vite dev server; Vite proxies `/api` and `/ws` to port 
 - Packed connectomes and neuron positions are assets on the `data-v1` GitHub Release, not git files.
   Rebuild them with `uv run python tools/pack_connectome.py` and `uv run python tools/export_site_data.py`
   (outputs in `web/public/data/`).
-- Readout snapshots in `web/public/snapshots/` are small and committed. `tools/publish_snapshots.sh`
-  re-exports the newest log-spaced set and pushes, which redeploys the site.
+- Readout snapshots live on the `site-data` branch: one commit, force-pushed by `./fly publish`
+  (from the `.publish/` worktree), which then dispatches the Pages workflow. `main` stays code-only.
+  For local builds, `uv run python tools/export_snapshots.py` writes them into `web/public/snapshots/`.
 - Locally: `(cd web && pnpm build && pnpm exec vite preview)` once `web/public/data/` exists.
 
 ## One-time setup
