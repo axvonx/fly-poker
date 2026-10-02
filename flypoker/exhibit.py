@@ -129,6 +129,23 @@ def _board(h: Hand) -> list[str]:
     return [f"{c[0].rank}{c[0].suit}" for c in h.state.board_cards]
 
 
+WINNINGS_FROM = 1_000_000  # the fair counter: the real fly's training winnings from this hand on
+
+
+def winnings_since(rows: list[dict], start: int) -> float:
+    """Big blinds (= dollars at the site's $1 big blind) the fly won in training from hand `start`.
+
+    Each log line covers the hands since the previous one, and gives bb/100 against each bot.
+    Opponents are drawn uniformly, so the line's total is the mean over bots times its hands.
+    """
+    total, prev = 0.0, None
+    for r in rows:
+        if prev is not None and prev >= start and r["bb100"]:
+            total += (r["hands"] - prev) * float(np.mean(list(r["bb100"].values()))) / 100
+        prev = r["hands"]
+    return total
+
+
 def run_stats(max_points: int = 240) -> dict:
     """Hands played per arm, plus the real fly's training-log series for the live graph."""
     out = {}
@@ -142,6 +159,7 @@ def run_stats(max_points: int = 240) -> dict:
         if arm == "real":
             step = max(1, len(lines) // max_points)
             rows = [json.loads(ln) for ln in lines]
+            out["winnings"] = winnings_since(rows, WINNINGS_FROM)
             out["series"] = [
                 {"hands": r["hands"], "bb100": r["bb100"], "entropy": r["entropy"]}
                 for r in rows[::-1][::step][::-1]

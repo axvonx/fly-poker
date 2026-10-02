@@ -67,6 +67,12 @@ ol { list-style: none; }
 
 .played { position: absolute; top: var(--gap); right: var(--gap); z-index: 1; text-align: right; }
 .played .hud__label { margin-bottom: calc(var(--u) * 0.4); }
+.played .winnings__label { margin-top: var(--u); }
+.counter--money { font-size: calc(var(--u) * 2.8); transition: color 300ms; }
+.counter--money[data-sign="up"] { color: #5cc777; }
+.counter--money[data-sign="down"] { color: var(--fire-2); }
+.winnings__since { font-family: var(--mono); font-size: calc(var(--u) * 1.15); color: var(--graphite); }
+.unit { font-family: var(--mono); font-size: 0.8em; color: var(--graphite); }
 
 .lens-toggle {
   position: absolute;
@@ -104,6 +110,11 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 0.35em; border: 1p
 .tag__action { font-family: var(--mono); font-size: calc(var(--u) * 1.4); color: var(--graphite); min-height: 1.35em; }
 .tag--fly .tag__name { color: var(--fire-3); }
 .tag--pot { font-family: var(--mono); font-size: calc(var(--u) * 1.7); }
+/* The result, in the dead space under the table: "The fly wins $50". */
+.verdict { display: block; white-space: nowrap; font: 700 calc(var(--u) * 2.8) var(--display); color: var(--paper); opacity: 0; }
+.verdict.is-shown { opacity: 1; animation: verdict 480ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+.verdict__amount.is-good { color: #5cc777; }
+.verdict__amount.is-bad { color: var(--fire-2); }
 /* At the end of a hand: the hand each seat made, green for the winner, red for the loser. */
 .tag.is-winner .tag__action, .tag.is-loser .tag__action {
   font: 700 calc(var(--u) * 1.9) / 1.1 var(--display);
@@ -120,7 +131,7 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 0.35em; border: 1p
 .hud {
   grid-area: hud;
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: calc(var(--gap) * 2);
   align-items: start;
   padding: var(--gap);
@@ -136,7 +147,8 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 0.35em; border: 1p
   color: var(--graphite);
 }
 
-.hud__training { display: grid; gap: calc(var(--u) * 0.5); align-content: start; }
+.hud__training { display: grid; gap: calc(var(--u) * 0.4); align-content: start; }
+.hud .hand { gap: calc(var(--u) * 0.8); padding: calc(var(--u) * 0.6) 0; align-self: center; }
 .counter {
   font-family: var(--mono);
   font-weight: 500;
@@ -176,13 +188,13 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 0.35em; border: 1p
 }
 
 /* The five choices, filled from the descending-neuron readout. */
-.readout { display: grid; gap: calc(var(--u) * 0.55); }
+.readout { display: grid; gap: calc(var(--u) * 0.35); }
 .readout__row {
   display: grid;
-  grid-template-columns: calc(var(--u) * 11) minmax(0, 1fr) calc(var(--u) * 4.5);
+  grid-template-columns: calc(var(--u) * 9.5) minmax(0, 1fr) calc(var(--u) * 4);
   align-items: center;
   gap: var(--u);
-  font-size: calc(var(--u) * 1.5);
+  font-size: calc(var(--u) * 1.35);
 }
 .readout__label { color: var(--graphite); }
 .readout__track { height: calc(var(--u) * 1.2); background: var(--slide); overflow: hidden; }
@@ -198,6 +210,32 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 0.35em; border: 1p
 .readout__row.is-chosen .readout__label { color: var(--paper); font-weight: 600; }
 .readout__row.is-chosen .readout__fill { background: var(--fire-3); }
 .readout__row.is-illegal { opacity: 0.3; }
+
+/* A hand, in big words: "Two pair" / "Kings and 8s" / how often it beats a random hand.
+   Shared by the play page (your hand) and the fair display (the fly's). */
+.hand { display: grid; gap: calc(var(--u) * 0.3); min-width: 0; }
+.hand__name {
+  font: 700 calc(var(--u) * 4.2) / 1 var(--display);
+  color: var(--paper);
+  min-height: 1em;
+}
+.hand__name.is-new { animation: pop 380ms cubic-bezier(0.2, 0.9, 0.3, 1.4) both; }
+@keyframes pop { from { transform: scale(0.85); opacity: 0; } }
+.hand__detail { font: 500 calc(var(--u) * 1.4) var(--mono); color: var(--fire-3); min-height: 1.3em; }
+.hand__meter { display: flex; align-items: center; gap: var(--u); font: 400 calc(var(--u) * 1.15) var(--mono); color: var(--graphite); }
+.hand__track { width: calc(var(--u) * 12); height: 6px; background: var(--slide); overflow: hidden; }
+.hand__fill {
+  display: block;
+  height: 100%;
+  background: var(--fire-2);
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 600ms cubic-bezier(0.2, 0.7, 0.2, 1), background 300ms;
+}
+.hand__meter[data-level="fair"] .hand__fill { background: var(--fire-3); }
+.hand__meter[data-level="strong"] .hand__fill { background: #5cc777; }
+.hand__pct { color: var(--paper); }
+.hand__chance { white-space: nowrap; }
 
 /* ── The specimen ───────────────────────────────────── */
 

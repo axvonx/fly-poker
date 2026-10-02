@@ -45,7 +45,7 @@
 
 /* ── The table ──────────────────────────────────────── */
 
-.tag--you .tag__name { color: var(--paper); }
+.tag--you .tag__name { color: #fff; }
 
 .loading {
   position: absolute;
@@ -102,31 +102,7 @@
 .act:disabled { opacity: 0.35; cursor: default; }
 .act--fold:not(:disabled) { color: var(--fire-2); }
 
-/* Your hand, in big words. */
 .hand-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--gap); }
-.hand { display: grid; gap: calc(var(--u) * 0.3); min-width: 0; }
-.hand__name {
-  font: 700 calc(var(--u) * 4.2) / 1 var(--display);
-  color: var(--paper);
-  min-height: 1em;
-}
-.hand__name.is-new { animation: pop 380ms cubic-bezier(0.2, 0.9, 0.3, 1.4) both; }
-@keyframes pop { from { transform: scale(0.85); opacity: 0; } }
-.hand__detail { font: 500 calc(var(--u) * 1.4) var(--mono); color: var(--fire-3); min-height: 1.3em; }
-.hand__meter { display: flex; align-items: center; gap: var(--u); font: 400 calc(var(--u) * 1.15) var(--mono); color: var(--graphite); }
-.hand__track { width: calc(var(--u) * 12); height: 6px; background: var(--slide); overflow: hidden; }
-.hand__fill {
-  display: block;
-  height: 100%;
-  background: var(--fire-2);
-  transform-origin: left;
-  transform: scaleX(0);
-  transition: transform 600ms cubic-bezier(0.2, 0.7, 0.2, 1), background 300ms;
-}
-.hand__meter[data-level="fair"] .hand__fill { background: var(--fire-3); }
-.hand__meter[data-level="strong"] .hand__fill { background: var(--win); }
-#hand-chance { color: var(--paper); }
-.hand__chance { white-space: nowrap; }
 
 .how, .next {
   flex: none;

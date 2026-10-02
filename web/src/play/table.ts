@@ -7,7 +7,7 @@ import type { GameEvent } from "../engine/game";
 import { ACTION_LABEL } from "../protocol";
 import { describe, type MadeHand } from "../hands";
 import {
-  buildTable, Card, chipStack, DECK, FAR_Z, handWords, HINT, lensFragment, lensVertex, LOSE, markShowdown, NEAR_Z,
+  buildTable, Card, chipStack, DECK, FACET, FAR_Z, FLY_COLOR, showVerdict, YOU_COLOR, handWords, HINT, lensFragment, lensVertex, LOSE, markShowdown, NEAR_Z,
   ROBOT_Z, runTweens, SeatRings, tween, WIN,
 } from "../table3d";
 import { FlyAvatar } from "./avatar";
@@ -40,6 +40,7 @@ export class PlayTable {
   private generation = 0; // bumped by reset(): queued events from an abandoned hand are dropped
   private glow: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   private labels: Record<Seat | "pot", HTMLElement>;
+  private verdict: HTMLElement; // "You win $50!", in the dead space under the table
   /** After the hand, what the fly was thinking, in a bubble beside its head. */
   readonly bubble: HTMLElement;
   private lens = false;
@@ -52,7 +53,8 @@ export class PlayTable {
     uniforms: {
       scene: { value: null },
       resolution: { value: new THREE.Vector2(1, 1) },
-      facet: { value: 18 },
+      facet: { value: FACET },
+      time: { value: 0 },
       background: { value: new THREE.Color("#0b0a10") },
     },
   });
@@ -84,6 +86,7 @@ export class PlayTable {
       return el;
     };
     this.labels = { fly: tag("tag--fly"), you: tag("tag--you"), pot: tag("tag--pot") };
+    this.verdict = tag("verdict");
     this.bubble = document.createElement("div");
     this.bubble.className = "bubble";
     this.bubble.hidden = true;
@@ -176,7 +179,10 @@ export class PlayTable {
         const winner: Seat | null = e.human_bb > 0 ? "you" : e.human_bb < 0 ? "fly" : null;
         const loser: Seat | null = winner === "you" ? "fly" : winner ? "you" : null;
         const amount = dollars(Math.abs(e.human_bb) * 100);
-        this.labels.pot.textContent = winner === "you" ? `You win ${amount}` : winner ? `The fly wins ${amount}` : "Split pot";
+        // This screen is on your side: your winnings are green, the fly's are red.
+        this.labels.pot.textContent = "";
+        showVerdict(this.verdict, winner === "you" ? { name: "You", color: YOU_COLOR } : winner ? { name: "The fly", color: FLY_COLOR } : null,
+          amount, winner === "you", winner === "you");
         const hands: Record<Seat, MadeHand> = {
           you: describe([...this.yourCodes, ...e.board]),
           fly: describe([...e.fly_cards, ...e.board]),
@@ -277,6 +283,7 @@ export class PlayTable {
     this.bets = { you: { amount: 0, stack: null }, fly: { amount: 0, stack: null } };
     this.pot = { amount: 0, stack: null };
     this.labels.pot.textContent = "";
+    this.verdict.classList.remove("is-shown");
     this.bubble.hidden = true;
     this.thinking(0);
   }
@@ -297,7 +304,7 @@ export class PlayTable {
     const px = this.renderer.getPixelRatio();
     this.target.setSize(Math.round(w * px), Math.round(h * px));
     this.lensMaterial.uniforms.resolution.value.set(w * px, h * px);
-    this.lensMaterial.uniforms.facet.value = 18 * px;
+    this.lensMaterial.uniforms.facet.value = FACET * px;
     this.camera.aspect = w / h;
     // Keep the whole table in frame on narrow screens.
     this.camera.fov = w / h < 1.6 ? 42 * (1.6 / (w / h)) ** 0.8 : 42;
@@ -325,8 +332,10 @@ export class PlayTable {
     this.place(this.labels.fly, new THREE.Vector3(1.8, 1.1, ROBOT_Z));
     this.place(this.labels.you, new THREE.Vector3(-2.1, 0.1, SEAT_Z.you));
     this.place(this.labels.pot, new THREE.Vector3(0, 0.1, 0.7));
+    this.place(this.verdict, new THREE.Vector3(0, -0.2, 2.75));
     if (!this.bubble.hidden) this.placeBubble();
     if (this.lens) {
+      this.lensMaterial.uniforms.time.value = now / 1000;
       this.renderer.setRenderTarget(this.target);
       this.renderer.render(this.scene, this.camera);
       this.renderer.setRenderTarget(null);

@@ -15,10 +15,10 @@ export const OPPONENTS = ["random", "station", "maniac", "equity", "slumbot"] as
 export type Opponent = (typeof OPPONENTS)[number];
 
 export const OPPONENT_LABEL: Record<Opponent, string> = {
-  random: "Random Bot",
-  station: "Calling Station Bot",
-  maniac: "Maniac Bot",
-  equity: "Equity Bot",
+  random: "Bot - Random",
+  station: "Bot - Always Call",
+  maniac: "Bot - Always Raise",
+  equity: "Bot - Plays the Odds",
   slumbot: "Slumbot",
 };
 
@@ -62,6 +62,7 @@ export type Message =
       shuffled?: { hands: number; hands_per_sec: number };
       nobrain?: { hands: number; hands_per_sec: number };
       series?: TrainingPoint[];
+      winnings?: number; // the real fly's training winnings since its millionth hand, in $ (= big blinds)
       eval: EvalPoint[];
     }
   | { type: "hand"; opponent: Opponent; fly_button: boolean; fly_cards: string[]; snapshot_hands: number }

@@ -14,8 +14,6 @@ import "./play.css";
 
 import { BrainView } from "../brain";
 import { gunzip, isGzip } from "../engine/connectome";
-import { DECK } from "../engine/poker";
-import { winChance } from "../hands";
 import type { GameEvent } from "../engine/game";
 import type { Reply, Request } from "../engine/worker";
 import { Bar } from "./bar";
@@ -94,7 +92,7 @@ async function boot(): Promise<void> {
   await fonts;
   const table = new PlayTable($("table") as HTMLCanvasElement, $("tags"));
   const chart = new Chart(training);
-  table.onHand = (h, hole, board) => bar.hand(h, winChance(hole, board, DECK));
+  table.onHand = (_h, hole, board) => bar.hand(hole, board);
 
   // ── how to play ──
   buildHowTo($("ranks"));
@@ -187,7 +185,7 @@ async function boot(): Promise<void> {
     thoughts = [];
     street = 0;
     bar.wait();
-    bar.hand(null, null);
+    bar.hand([], []);
     const seed = crypto.getRandomValues(new Uint32Array(1))[0];
     const reply = await call({ type: "newHand", seed, humanSeat: handNo++ % 2 });
     await play(reply, g);
@@ -225,7 +223,7 @@ async function boot(): Promise<void> {
     table.reset();
     brain.rest();
     bar.wait();
-    bar.hand(null, null);
+    bar.hand([], []);
     await load();
     if (g === generation) void deal(); // a later change deals its own hand
   });

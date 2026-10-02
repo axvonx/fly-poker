@@ -1,10 +1,13 @@
-// The HUD under the table: the five readout bars the fly chooses from.
+// The HUD under the table: the fly's hand in big words, and the five readout bars it chooses from.
 
+import { HandPanel } from "./handpanel";
 import { ACTIONS, ACTION_LABEL, type Action, type Message } from "./protocol";
 
 const $ = (id: string) => document.getElementById(id)!;
 
 export class Hud {
+  private hand = new HandPanel($("fly-hand"));
+  private flyCards: string[] = [];
   private bars = new Map<Action, { row: HTMLElement; fill: HTMLElement; value: HTMLElement }>();
 
   constructor() {
@@ -22,7 +25,11 @@ export class Hud {
 
   handle(m: Message): void {
     if (m.type === "hand") {
+      this.flyCards = m.fly_cards;
+      this.hand.cards(this.flyCards, []);
       this.reset();
+    } else if (m.type === "board") {
+      this.hand.cards(this.flyCards, m.cards);
     } else if (m.type === "thinking") {
       this.reset(m.legal);
     } else if (m.type === "decision") {

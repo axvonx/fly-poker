@@ -1,6 +1,7 @@
 // Live training stats: a ticking hands counter and the real fly's winnings against each
 // bot during training (the noisy training log, smoothed), one line per bot in its colour.
 
+import { signedDollars } from "./play/money";
 import { OPPONENT_COLOR, OPPONENT_LABEL, type Message, type Opponent, type TrainingPoint } from "./protocol";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -36,6 +37,11 @@ export class Training {
     this.perSec = m.real.hands_per_sec;
     this.stamp = performance.now();
     if (m.series) this.graph(m.series);
+    if (m.winnings !== undefined) {
+      const chips = Math.round(m.winnings * 100);
+      $("winnings").textContent = chips ? signedDollars(chips) : "$0";
+      $("winnings").dataset.sign = chips > 0 ? "up" : chips < 0 ? "down" : "";
+    }
   }
 
   private graph(series: TrainingPoint[]): void {

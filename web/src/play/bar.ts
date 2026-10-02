@@ -2,13 +2,14 @@
 // "Next hand" in their place. Always: your hand, in big words, and how often it beats a random hand.
 
 import type { Obs } from "../engine/poker";
-import type { MadeHand } from "../hands";
+import { HandPanel } from "../handpanel";
 import { ACTIONS, ACTION_LABEL } from "../protocol";
 import { dollars } from "./money";
 
 const $ = (id: string) => document.getElementById(id)!;
 export class Bar {
   private buttons: HTMLButtonElement[];
+  private handPanel = new HandPanel($("hand"));
 
   constructor(onAct: (action: number) => void, onNext: () => void) {
     this.buttons = ACTIONS.map((a, i) => {
@@ -57,23 +58,8 @@ export class Bar {
   }
 
   /** Your best hand right now, and how often it beats a random hand from here. */
-  hand(h: MadeHand | null, chance: number | null): void {
-    const name = $("hand-name");
-    const text = h ? h.name : "";
-    if (name.textContent !== text) {
-      name.textContent = text;
-      name.classList.remove("is-new");
-      void name.offsetWidth; // restart the pop animation
-      name.classList.add("is-new");
-    }
-    $("hand-detail").textContent = h ? h.detail : "";
-    const meter = $("hand-meter");
-    meter.hidden = chance === null;
-    if (chance !== null) {
-      ($("hand-fill") as HTMLElement).style.transform = `scaleX(${chance})`;
-      $("hand-chance").textContent = `${Math.round(chance * 100)}%`;
-      meter.dataset.level = chance >= 0.65 ? "strong" : chance >= 0.45 ? "fair" : "weak";
-    }
+  hand(hole: string[], board: string[]): void {
+    this.handPanel.cards(hole, board);
   }
 
   /** The hand is over: "Next hand" takes the buttons' place. */

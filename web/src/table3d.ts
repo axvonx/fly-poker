@@ -3,6 +3,7 @@
 
 import * as THREE from "three";
 import { describe, type MadeHand } from "./hands";
+import { dollars } from "./play/money";
 import { OPPONENT_COLOR, OPPONENT_LABEL, ACTION_LABEL, type Message } from "./protocol";
 
 export const CARD_W = 0.62, CARD_H = 0.87;
@@ -224,6 +225,28 @@ export function markShowdown(cards: Map<string, Card>, winners: MadeHand[], lose
   for (const code of win) cards.get(code)?.highlight(WIN, lose.has(code) ? LOSE : undefined);
 }
 
+/** The result line under the table: "The fly wins $50", the name in its seat's colour and the
+ * amount green or red for whoever's side this screen is on. who = null means a split pot. */
+export function showVerdict(el: HTMLElement, who: { name: string; color: string } | null, amount: string, good: boolean, exclaim = false): void {
+  el.replaceChildren();
+  if (!who) {
+    el.textContent = "Split pot";
+  } else {
+    const name = document.createElement("span");
+    name.className = "verdict__who";
+    name.style.color = who.color;
+    name.textContent = who.name;
+    const money = document.createElement("span");
+    money.className = `verdict__amount ${good ? "is-good" : "is-bad"}`;
+    money.textContent = amount;
+    el.append(name, document.createTextNode(who.name === "You" ? " win " : " wins "), money, document.createTextNode(exclaim ? "!" : ""));
+  }
+  el.classList.remove("is-shown");
+  void el.offsetWidth; // restart the entrance animation
+  el.classList.add("is-shown");
+}
+export const FLY_COLOR = "#f7b538", YOU_COLOR = "#ffffff";
+
 /** The words under a seat's name at the end: "Two pair" over "Kings and 8s" (two lines). */
 export function handWords(h: MadeHand): string {
   return `${h.name}\n${h.detail}`;
@@ -275,8 +298,11 @@ class Robot {
 }
 
 // ── the fly's-eye lens ────────────────────────────────────────────────────────
-// A compound eye: the view is broken into hexagonal facets, each one lens seeing one
-// patch of the scene, on a bulging (barrel-distorted) eye.
+// A compound eye. The view is tiled with small hexagonal facets laid on a curved eye (they shrink
+// toward the rim), and each facet is its own tiny lens: it shows an inverted, magnified patch of
+// the scene around its centre. On top: a strong fisheye that breathes slowly, colour fringing
+// toward the rim, dark walls between facets, a glint on each lens, and a faint per-facet shimmer.
+export const FACET = 10; // facet size in CSS pixels
 export const lensVertex = /* glsl */ `
   varying vec2 vUv;
   void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
@@ -285,26 +311,43 @@ export const lensFragment = /* glsl */ `
   uniform sampler2D scene;
   uniform vec2 resolution;
   uniform float facet;
+  uniform float time;
   uniform vec3 background;
   varying vec2 vUv;
-  vec2 bulge(vec2 uv) {
+  const float CURVE = 0.6;   // how much the facet grid compresses toward the rim
+  const float LENS = 1.4;    // each facet's magnification
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  vec2 fisheye(vec2 uv) {
     vec2 c = uv - 0.5;
-    return 0.5 + c * (0.72 + 0.55 * dot(c, c));
+    return 0.5 + c * (0.8 + 1.0 * dot(c, c) + 0.03 * sin(time * 0.7));
+  }
+  vec3 look(vec2 uv) {
+    vec4 s = texture2D(scene, uv);
+    return mix(background, s.rgb, s.a);
   }
   void main() {
-    vec2 p = vUv * resolution / facet;
-    vec2 r = vec2(1.0, 1.7320508), h = r * 0.5;
-    vec2 a = mod(p, r) - h, b = mod(p - h, r) - h;
-    vec2 gv = dot(a, a) < dot(b, b) ? a : b;
-    vec2 cell = (p - gv) * facet / resolution;
-    vec4 s = texture2D(scene, bulge(cell));
-    vec3 col = mix(background, s.rgb, s.a);
+    float aspect = resolution.x / resolution.y;
+    vec2 e = (vUv - 0.5) * vec2(aspect, 1.0);           // eye coordinates, height 1
+    float r = length(e);
+    vec2 p = e * (1.0 + CURVE * r * r) * resolution.y / facet;
+    vec2 rr = vec2(1.0, 1.7320508), h = rr * 0.5;
+    vec2 a = mod(p, rr) - h, b = mod(p - h, rr) - h;
+    vec2 gv = dot(a, a) < dot(b, b) ? a : b;            // position within the facet
+    vec2 id = p - gv;                                    // the facet
+    vec2 cw = id * facet / resolution.y;
+    vec2 centre = cw / (1.0 + CURVE * dot(cw, cw)) / vec2(aspect, 1.0) + 0.5;
+    vec2 local = -gv * facet / resolution.y / vec2(aspect, 1.0) * LENS;   // inverted, magnified
+    vec2 uv = fisheye(centre + local);
+    vec2 fringe = (uv - 0.5) * (0.004 + 0.014 * r);
+    vec3 col = vec3(look(uv + fringe).r, look(uv).g, look(uv - fringe).b);
+    float n = hash(id);
+    col *= mix(vec3(1.04, 0.97, 0.9), vec3(0.92, 0.98, 1.06), hash(id + 3.1)) * (0.88 + 0.24 * n);
+    col *= 0.95 + 0.05 * sin(time * 2.0 + n * 6.2832);
     vec2 q = abs(gv);
-    float d = max(dot(q, normalize(r)), q.x);           // 0 at a facet's centre, 0.5 at its rim
-    col *= 1.0 - 0.55 * smoothstep(0.38, 0.5, d);       // dark walls between facets
-    col += 0.05 * (1.0 - smoothstep(0.0, 0.28, d));     // each lens catches a little light
-    vec2 e = (vUv - 0.5) * vec2(resolution.x / resolution.y, 1.0);
-    col = mix(background, col * 1.15, smoothstep(0.95, 0.5, length(e)));
+    float d = max(dot(q, normalize(rr)), q.x);          // 0 at a facet's centre, 0.5 at its rim
+    col *= 1.0 - 0.45 * smoothstep(0.4, 0.5, d);        // dark walls between facets
+    col += 0.22 * exp(-dot(gv - vec2(-0.16, 0.18), gv - vec2(-0.16, 0.18)) * 60.0); // the glint
+    col = mix(background, col * 1.3, smoothstep(1.05, 0.62, r));            // the eye's edge, a little brighter inside
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -359,6 +402,8 @@ export class Table3D {
   private pending = 0;
   private glow: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   private labels: Record<"opponent" | "fly" | "pot", HTMLElement>;
+  private verdict: HTMLElement; // "The fly wins $50", in the dead space under the table
+  private opponent: { name: string; color: string } = { name: "", color: "#fff" };
   private robot = new Robot();
   private lens = false;
   private target = new THREE.WebGLRenderTarget(1, 1);
@@ -370,7 +415,8 @@ export class Table3D {
     uniforms: {
       scene: { value: null },
       resolution: { value: new THREE.Vector2(1, 1) },
-      facet: { value: 18 },
+      facet: { value: FACET },
+      time: { value: 0 },
       background: { value: new THREE.Color("#0b0a10") },
     },
   });
@@ -406,6 +452,7 @@ export class Table3D {
       return el;
     };
     this.labels = { opponent: tag("tag--opponent"), fly: tag("tag--fly"), pot: tag("tag--pot") };
+    this.verdict = tag("verdict");
 
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
@@ -439,7 +486,9 @@ export class Table3D {
         this.clear();
         this.flyCodes = m.fly_cards;
         this.robot.wear(OPPONENT_COLOR[m.opponent]);
-        this.setTag("opponent", OPPONENT_LABEL[m.opponent], "");
+        this.opponent = { name: OPPONENT_LABEL[m.opponent], color: OPPONENT_COLOR[m.opponent] };
+        this.setTag("opponent", this.opponent.name, "");
+        (this.labels.opponent.querySelector(".tag__name") as HTMLElement).style.color = this.opponent.color;
         this.setTag("fly", "The fly", m.fly_button ? "Dealer" : "Big blind");
         const flyBlind = m.fly_button ? 50 : 100;
         this.lastTotal = 150;
@@ -469,7 +518,7 @@ export class Table3D {
         break;
       case "thinking":
         this.setTag("fly", null, "Thinking…");
-        this.labels.pot.textContent = `Pot ${m.pot.toLocaleString()}`;
+        this.labels.pot.textContent = `Pot ${dollars(m.pot)}`;
         break;
       case "decision":
         this.thinking(0);
@@ -486,10 +535,11 @@ export class Table3D {
         }
         await this.sweepBets();
         const winner: Seat | null = m.fly_bb > 0 ? "fly" : m.fly_bb < 0 ? "opponent" : null;
-        const bb = Math.abs(m.fly_bb);
-        const amount = `${bb >= 10 ? Math.round(bb) : Math.round(bb * 10) / 10} big blind${bb === 1 ? "" : "s"}`;
-        this.labels.pot.textContent =
-          winner === "fly" ? `The fly wins ${amount}` : winner ? `The fly loses ${amount}` : "Split pot";
+        const amount = dollars(Math.abs(m.fly_bb) * 100);
+        // This screen is on the fly's side: its winnings are green, the bot's are red.
+        this.labels.pot.textContent = "";
+        showVerdict(this.verdict, winner === "fly" ? { name: "The fly", color: FLY_COLOR } : winner ? this.opponent : null,
+          amount, winner === "fly");
         const loser: Seat | null = winner === "fly" ? "opponent" : winner ? "fly" : null;
         if (m.showdown) {
           const board = this.boardCodes;
@@ -530,7 +580,7 @@ export class Table3D {
     const added = total - this.lastTotal;
     this.lastTotal = total;
     if (added > 0) await this.bet(seat, added);
-    this.labels.pot.textContent = `Pot ${total.toLocaleString()}`;
+    this.labels.pot.textContent = `Pot ${dollars(total)}`;
   }
 
   private async bet(seat: Seat, added: number): Promise<void> {
@@ -581,6 +631,7 @@ export class Table3D {
     this.bets = { fly: { amount: 0, stack: null }, opponent: { amount: 0, stack: null } };
     this.pot = { amount: 0, stack: null };
     this.labels.pot.textContent = "";
+    this.verdict.classList.remove("is-shown");
     this.thinking(0);
   }
 
@@ -597,7 +648,7 @@ export class Table3D {
     const px = this.renderer.getPixelRatio();
     this.target.setSize(Math.round(w * px), Math.round(h * px));
     this.lensMaterial.uniforms.resolution.value.set(w * px, h * px);
-    this.lensMaterial.uniforms.facet.value = 18 * px;
+    this.lensMaterial.uniforms.facet.value = FACET * px;
     this.camera.aspect = w / h;
     // Keep the whole table in frame on narrow screens.
     this.camera.fov = w / h < 1.6 ? 42 * (1.6 / (w / h)) ** 0.8 : 42;
@@ -616,7 +667,9 @@ export class Table3D {
     this.place(this.labels.opponent, new THREE.Vector3(1.45, 1.1, ROBOT_Z));
     this.place(this.labels.fly, new THREE.Vector3(-2.1, 0.1, SEAT_Z.fly));
     this.place(this.labels.pot, new THREE.Vector3(0, 0.1, 0.7));
+    this.place(this.verdict, new THREE.Vector3(0, -0.2, 2.75));
     if (this.lens) {
+      this.lensMaterial.uniforms.time.value = now / 1000;
       this.renderer.setRenderTarget(this.target);
       this.renderer.render(this.scene, this.camera);
       this.renderer.setRenderTarget(null);
