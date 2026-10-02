@@ -46,7 +46,7 @@ jobs:
       - name: Fetch published snapshots (the site-data branch, force-pushed by ./fly publish)
         run: |
           git fetch --depth 1 origin site-data
-          git archive FETCH_HEAD snapshots | tar -x -C public
+          git -C "$GITHUB_WORKSPACE" archive FETCH_HEAD snapshots | tar -x -C public   # paths from the repo root
           ls public/snapshots
       - name: Fetch packed connectomes
         env:
