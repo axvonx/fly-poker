@@ -12,3 +12,5 @@ web/dist/
 *.npz
 *.feather
 *.bin
+.lavish/
+.claude/
