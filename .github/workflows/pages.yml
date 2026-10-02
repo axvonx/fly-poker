@@ -1,0 +1,67 @@
+# Build web/ and deploy it to GitHub Pages.
+#
+# The packed connectomes are too big to belong in git. They live as assets on the GitHub
+# Release tagged data-v1 (made once from tools/pack_connectome.py output) and are copied into
+# the site at deploy time. Readout snapshots (web/public/snapshots, small) come from the repo.
+
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  DATA_RELEASE: data-v1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Fetch packed connectomes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p public/data
+          gh release download "$DATA_RELEASE" --repo "$GITHUB_REPOSITORY" --dir public/data \
+            --pattern 'connectome-*.bin' --pattern 'connectome-*.json'
+          ls -l public/data
+      - run: pnpm test # golden parity, including the fly cases now that the connectomes are here
+      - name: Build (relative base: the site is served from /<repo>/)
+        run: pnpm exec tsc --noEmit && pnpm exec vite build --base ./
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
