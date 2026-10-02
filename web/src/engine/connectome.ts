@@ -39,13 +39,37 @@ export async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-/** Fetch and decode a packed connectome. Handles the file being served gzipped or not. */
-export async function fetchConnectome(url: string): Promise<Connectome> {
+/** Fetch and decode a packed connectome. Handles the file being served gzipped or not.
+ * onProgress gets bytes received so far and the Content-Length (0 when the server omits it). */
+export async function fetchConnectome(
+  url: string, onProgress?: (loaded: number, total: number) => void,
+): Promise<Connectome> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-  let bytes: Uint8Array = new Uint8Array(await res.arrayBuffer());
+  let bytes: Uint8Array = onProgress && res.body ? await readAll(res, onProgress) : new Uint8Array(await res.arrayBuffer());
   if (isGzip(bytes)) bytes = await gunzip(bytes);
   return parseConnectome(bytes);
+}
+
+async function readAll(res: Response, onProgress: (loaded: number, total: number) => void): Promise<Uint8Array> {
+  const total = Number(res.headers.get("Content-Length")) || 0;
+  const reader = res.body!.getReader();
+  const chunks: Uint8Array[] = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    onProgress(loaded, total);
+  }
+  const out = new Uint8Array(loaded);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.length;
+  }
+  return out;
 }
 
 /** Decode an (uncompressed) packed connectome. */

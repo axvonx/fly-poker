@@ -98,7 +98,21 @@ browser and shows live training stats from the `log.jsonl` files. It only reads 
     uv run python -m flypoker.server         # http://localhost:8765  (--arm shuffled, --port N)
 
 To work on the frontend with hot reload, keep the server running and also run `(cd web && pnpm dev)`.
-Vite proxies `/api` and `/ws` to port 8765.
+Open `/fair.html` on the Vite dev server; Vite proxies `/api` and `/ws` to port 8765.
+
+## Public site (play the fly)
+
+`web/index.html` is the public page: visitors play heads-up against the fly, entirely in the browser
+(the engine in `web/src/engine/` is a port checked against Python golden cases by `pnpm test`).
+`web/fair.html` is the booth display above. GitHub Pages deploys on every push to `main` that touches
+`web/` (`.github/workflows/pages.yml`).
+
+- Packed connectomes and neuron positions are assets on the `data-v1` GitHub Release, not git files.
+  Rebuild them with `uv run python tools/pack_connectome.py` and `uv run python tools/export_site_data.py`
+  (outputs in `web/public/data/`).
+- Readout snapshots in `web/public/snapshots/` are small and committed. `tools/publish_snapshots.sh`
+  re-exports the newest log-spaced set and pushes, which redeploys the site.
+- Locally: `(cd web && pnpm build && pnpm exec vite preview)` once `web/public/data/` exists.
 
 ## One-time setup
 

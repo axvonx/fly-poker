@@ -3,30 +3,56 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fly at the Table</title>
+    <title>Play the Fly</title>
+    <meta name="description" content="Play heads-up poker against a fruit fly's connectome: 166,700 real neurons, frozen wiring, a trained readout." />
   </head>
   <body>
-    <main class="stage">
-      <section class="game" aria-label="The hand being played">
-        <h1 class="title">A fruit fly's nervous system, playing poker</h1>
-        <div class="played">
-          <p class="hud__label">Hands played</p>
-          <p class="counter" id="hands">—</p>
+    <main class="play">
+      <header class="masthead">
+        <div class="masthead__text">
+          <h1 class="title">Play poker against a fruit fly's brain</h1>
+          <p class="story">
+            Its wiring is a real fly's (166,700 neurons, frozen). Only how we read its decisions was trained.
+          </p>
+          <label class="practice">
+            <span>Playing the fly after</span>
+            <input id="practice" type="range" min="0" max="0" step="1" value="0" aria-describedby="practice-out" />
+            <output id="practice-out"><span id="practice-hands">—</span> hands of practice</output>
+          </label>
         </div>
+        <div class="score" aria-live="polite">
+          <p class="hud__label">You vs the fly</p>
+          <p class="counter" id="score-value">$0</p>
+          <p class="score__detail" id="score-detail">over 0 hands</p>
+        </div>
+      </header>
+
+      <section class="game" aria-label="The table">
         <button class="lens-toggle" id="lens" type="button" aria-pressed="false">Fly's-eye view <kbd>F</kbd></button>
         <canvas id="table"></canvas>
         <div class="tags" id="tags" aria-live="polite"></div>
+        <div class="loading" id="loading" role="status">
+          <p id="loading-text">Downloading the fly's brain…</p>
+          <span class="loading__track"><span class="loading__fill" id="loading-fill"></span></span>
+          <p class="loading__note">About 16 MB, once. After that everything runs in your browser.</p>
+        </div>
       </section>
 
-      <section class="hud" aria-label="The fly's hand and choices">
-        <div class="hud__hand">
-          <p class="hud__label">The fly's cards</p>
-          <div class="cards" id="fly-cards"></div>
+      <section class="bar" aria-label="Your move">
+        <div class="bar__main">
+          <div id="bar-actions">
+            <p class="hud__label" id="bar-status">Loading…</p>
+            <div class="actions" id="actions"></div>
+          </div>
+          <div id="bar-recap" hidden>
+            <p class="hud__label"><span id="recap-verdict"></span> What the fly was thinking:</p>
+            <ol class="recap" id="recap-list"></ol>
+            <button class="next" id="next" type="button">Next hand</button>
+          </div>
         </div>
-        <ol class="readout" id="readout" aria-label="How strongly each choice is firing"></ol>
         <div class="hud__training">
-          <p class="hud__label">Winnings</p>
-          <svg id="training-graph" viewBox="0 0 360 72" role="img" aria-label="Winnings against each bot during training"></svg>
+          <p class="hud__label">How this fly did against practice bots <span class="unit">($ per 100 hands)</span></p>
+          <svg id="training-graph" viewBox="0 0 360 90" role="img" aria-label="Winnings against each practice bot during training, with a marker at the fly you are playing"></svg>
           <ul class="legend" id="legend"></ul>
         </div>
       </section>
@@ -38,8 +64,13 @@
           <div class="scalebar" id="scalebar"><span class="scalebar__bar"></span><span class="scalebar__text">100 µm</span></div>
           <div class="lut"><span class="lut__ramp"></span><span class="lut__text">resting</span><span class="lut__text">firing</span></div>
         </div>
+        <p class="credit">
+          Connectome: <a href="https://www.janelia.org/project-team/flyem">MaleCNS v1.0</a> by FlyEM (HHMI Janelia),
+          Cambridge &amp; Google, CC-BY 4.0 ·
+          <a href="https://github.com/axvonx/fly-poker">Code on GitHub</a>
+        </p>
       </aside>
     </main>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/play/main.ts"></script>
   </body>
 </html>

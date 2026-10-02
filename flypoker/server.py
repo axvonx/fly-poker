@@ -108,7 +108,7 @@ def make_app(arm: str) -> web.Application:
     app.router.add_get("/ws", socket)
     if WEB_DIST.exists():
         async def index(_):
-            return web.FileResponse(WEB_DIST / "index.html")
+            return web.FileResponse(WEB_DIST / "fair.html")
         app.router.add_get("/", index)
         app.router.add_static("/", WEB_DIST)
     app.on_startup.append(start)

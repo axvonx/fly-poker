@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { OPPONENT_COLOR, OPPONENT_LABEL, ACTION_LABEL, type Message } from "./protocol";
 
-const CARD_W = 0.62, CARD_H = 0.87;
+export const CARD_W = 0.62, CARD_H = 0.87;
 const FELT = "#1f5a40", RAIL = "#3b2a22"; // tournament green felt, leather rail
 const PAPER = "#ede6d6", INK = "#0b0a10", RED = "#b3261e";
 const CHIP_COLORS = ["#8c1d5b", "#e0533a", "#f7b538", "#fff6d8"]; // Fire, low to high value
@@ -12,19 +12,20 @@ const SUIT: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
 
 type Seat = "fly" | "opponent";
 const SEAT_Z: Record<Seat, number> = { fly: 1.15, opponent: -1.25 };
-const DECK = new THREE.Vector3(2.35, 0.02, -0.2);
+export const NEAR_Z = SEAT_Z.fly, FAR_Z = SEAT_Z.opponent;
+export const DECK = new THREE.Vector3(2.35, 0.02, -0.2);
 
 // ── tiny tween runner ─────────────────────────────────────────────────────────
 type Tween = { t0: number; dur: number; step: (k: number) => void; done: () => void };
 const tweens = new Set<Tween>();
 const ease = (k: number) => 1 - Math.pow(1 - k, 3);
 let speed = 1; // < 1 while catching up with a backlog of events
-function tween(dur: number, step: (k: number) => void): Promise<void> {
+export function tween(dur: number, step: (k: number) => void): Promise<void> {
   dur *= speed;
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) dur = 1;
   return new Promise((done) => tweens.add({ t0: performance.now(), dur, step, done }));
 }
-function runTweens(now: number): void {
+export function runTweens(now: number): void {
   for (const t of tweens) {
     const k = Math.min(1, (now - t.t0) / t.dur);
     t.step(ease(k));
@@ -74,7 +75,7 @@ function cardTexture(code: string | null): THREE.Texture {
   return tex;
 }
 
-class Card {
+export class Card {
   readonly group = new THREE.Group();
   private front: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
   constructor(code: string | null) {
@@ -112,7 +113,7 @@ class Card {
 const chipGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.032, 28);
 const chipMats = CHIP_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.45, metalness: 0.05 }));
 
-function chipStack(amount: number): THREE.Group {
+export function chipStack(amount: number): THREE.Group {
   const g = new THREE.Group();
   // Height grows with the log of the amount, so an all-in towers over a blind.
   const n = Math.max(1, Math.min(18, Math.round(2.2 * Math.log2(amount / 25))));
@@ -129,7 +130,7 @@ function chipStack(amount: number): THREE.Group {
 
 // ── the opponent's avatar ─────────────────────────────────────────────────────
 // One robot behind the far seat, repainted in each bot's colour. More bots, more colours.
-const ROBOT_Z = -2.75;
+export const ROBOT_Z = -2.75;
 class Robot {
   readonly group = new THREE.Group();
   private paint = new THREE.MeshStandardMaterial({ color: "#888", roughness: 0.45, metalness: 0.25 });
@@ -175,11 +176,11 @@ class Robot {
 // ── the fly's-eye lens ────────────────────────────────────────────────────────
 // A compound eye: the view is broken into hexagonal facets, each one lens seeing one
 // patch of the scene, on a bulging (barrel-distorted) eye.
-const lensVertex = /* glsl */ `
+export const lensVertex = /* glsl */ `
   varying vec2 vUv;
   void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
 `;
-const lensFragment = /* glsl */ `
+export const lensFragment = /* glsl */ `
   uniform sampler2D scene;
   uniform vec2 resolution;
   uniform float facet;
@@ -206,6 +207,34 @@ const lensFragment = /* glsl */ `
     gl_FragColor = vec4(col, 1.0);
   }
 `;
+
+// ── the table itself: lights, felt, rail ──────────────────────────────────────
+export function buildTable(scene: THREE.Scene): void {
+  scene.add(new THREE.HemisphereLight("#d8cfe8", "#0b0a10", 1.1));
+  const key = new THREE.SpotLight("#fff1dc", 60, 14, 0.75, 0.6);
+  key.position.set(0, 6, 1.2);
+  scene.add(key, key.target);
+
+  // A stadium-shaped table: felt top inside a padded rail.
+  const shape = (w: number, d: number) => {
+    const s = new THREE.Shape(), r = d / 2;
+    s.absarc(-w / 2 + r, 0, r, Math.PI / 2, (3 * Math.PI) / 2, false);
+    s.absarc(w / 2 - r, 0, r, -Math.PI / 2, Math.PI / 2, false);
+    return s;
+  };
+  const railShape = shape(6.6, 4.2);
+  railShape.holes.push(shape(6.0, 3.6)); // a padded ring around the felt, not a lid over it
+  const rail = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(railShape, { depth: 0.16, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, curveSegments: 48 }),
+    new THREE.MeshStandardMaterial({ color: RAIL, roughness: 0.6 }),
+  );
+  rail.rotation.x = -Math.PI / 2;
+  rail.position.y = -0.17;
+  const felt = new THREE.Mesh(new THREE.ShapeGeometry(shape(6.0, 3.6), 48), new THREE.MeshStandardMaterial({ color: FELT, roughness: 0.95 }));
+  felt.rotation.x = -Math.PI / 2;
+  felt.position.y = 0.001;
+  scene.add(rail, felt);
+}
 
 // ── the table ─────────────────────────────────────────────────────────────────
 export class Table3D {
@@ -249,30 +278,7 @@ export class Table3D {
     this.camera.position.set(0, 6.6, 5.8);
     this.camera.lookAt(0, 0, -0.35); // framed to include the robot behind the far seat
 
-    this.scene.add(new THREE.HemisphereLight("#d8cfe8", "#0b0a10", 1.1));
-    const key = new THREE.SpotLight("#fff1dc", 60, 14, 0.75, 0.6);
-    key.position.set(0, 6, 1.2);
-    this.scene.add(key, key.target);
-
-    // A stadium-shaped table: felt top inside a padded rail.
-    const shape = (w: number, d: number) => {
-      const s = new THREE.Shape(), r = d / 2;
-      s.absarc(-w / 2 + r, 0, r, Math.PI / 2, (3 * Math.PI) / 2, false);
-      s.absarc(w / 2 - r, 0, r, -Math.PI / 2, Math.PI / 2, false);
-      return s;
-    };
-    const railShape = shape(6.6, 4.2);
-    railShape.holes.push(shape(6.0, 3.6)); // a padded ring around the felt, not a lid over it
-    const rail = new THREE.Mesh(
-      new THREE.ExtrudeGeometry(railShape, { depth: 0.16, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, curveSegments: 48 }),
-      new THREE.MeshStandardMaterial({ color: RAIL, roughness: 0.6 }),
-    );
-    rail.rotation.x = -Math.PI / 2;
-    rail.position.y = -0.17;
-    const felt = new THREE.Mesh(new THREE.ShapeGeometry(shape(6.0, 3.6), 48), new THREE.MeshStandardMaterial({ color: FELT, roughness: 0.95 }));
-    felt.rotation.x = -Math.PI / 2;
-    felt.position.y = 0.001;
-    this.scene.add(rail, felt);
+    buildTable(this.scene);
 
     // The fly's seat glows while it thinks, in the brain's own colours.
     this.glow = new THREE.Mesh(

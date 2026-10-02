@@ -1,0 +1,167 @@
+/* The public play page. Shares tokens and pieces (tags, cards, legend, specimen) with the
+   fair display's style.css; only the layout and the controls are its own. */
+
+.play {
+  --u: clamp(9px, 0.85vmin, 14px);
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "head specimen" "game specimen" "bar specimen";
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* ── Masthead ───────────────────────────────────────── */
+
+.masthead {
+  grid-area: head;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--gap);
+  padding: var(--gap) var(--gap) 0;
+}
+.masthead__text { display: grid; gap: calc(var(--u) * 0.8); min-width: 0; }
+.play .title { position: static; }
+.story { color: var(--graphite); max-width: 52ch; }
+
+.practice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--u) * 0.4) var(--u);
+  font-size: calc(var(--u) * 1.4);
+}
+.practice output { font-family: var(--mono); }
+#practice-hands { color: var(--fire-3); }
+#practice { width: min(20rem, 100%); accent-color: var(--fire-3); }
+
+.score { text-align: right; flex: none; }
+.score .hud__label { margin-bottom: calc(var(--u) * 0.4); }
+.score__detail { font-family: var(--mono); font-size: calc(var(--u) * 1.2); color: var(--graphite); }
+#score-value[data-sign="up"] { color: var(--fire-3); }
+#score-value[data-sign="down"] { color: var(--fire-2); }
+
+/* ── The table ──────────────────────────────────────── */
+
+.tag--you .tag__name { color: var(--paper); }
+
+.loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--u);
+  background: rgb(11 10 16 / 0.82);
+  font-family: var(--mono);
+  text-align: center;
+  padding: var(--gap);
+}
+.loading[hidden] { display: none; }
+.loading__track { width: min(22rem, 70vw); height: 4px; background: var(--coverslip-edge); overflow: hidden; }
+.loading__fill { display: block; height: 100%; background: var(--fire); transform-origin: left; transform: scaleX(0); }
+.loading__note { color: var(--graphite); font-size: calc(var(--u) * 1.2); }
+.loading.is-error #loading-text { color: var(--fire-2); }
+.loading.is-error .loading__track, .loading.is-error .loading__note { display: none; }
+
+/* ── The bar: your choices, or the fly's recap ──────── */
+
+.bar {
+  grid-area: bar;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: calc(var(--gap) * 1.5);
+  align-items: start;
+  padding: var(--gap);
+  background: var(--coverslip);
+  border-top: 1px solid var(--coverslip-edge);
+}
+.bar__main { min-width: 0; }
+#bar-status:empty::before { content: "\00a0"; }
+
+.actions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--u); }
+.act {
+  display: grid;
+  gap: calc(var(--u) * 0.2);
+  justify-items: center;
+  padding: var(--u) calc(var(--u) * 0.5);
+  min-height: 44px;
+  background: var(--slide);
+  color: var(--paper);
+  border: 1px solid var(--coverslip-edge);
+  font: 600 calc(var(--u) * 1.5) var(--body);
+  cursor: pointer;
+}
+.act__detail { font: 400 calc(var(--u) * 1.2) var(--mono); color: var(--graphite); min-height: 1.2em; }
+.act:hover:not(:disabled) { border-color: var(--fire-3); }
+.act:focus-visible, .next:focus-visible { outline: 2px solid var(--fire-3); outline-offset: 2px; }
+.act:disabled { opacity: 0.35; cursor: default; }
+.act--fold:not(:disabled) { color: var(--fire-2); }
+
+.recap { display: grid; gap: var(--u); margin-bottom: var(--u); }
+.thought { display: grid; gap: calc(var(--u) * 0.35); }
+.thought--none { color: var(--graphite); }
+.thought__head { font-size: calc(var(--u) * 1.4); }
+.thought__street { color: var(--graphite); }
+.thought__action { font-weight: 600; }
+.thought__bar { display: flex; height: calc(var(--u) * 0.9); gap: 2px; }
+.seg { min-width: 3px; opacity: 0.55; }
+.seg.is-chosen { opacity: 1; outline: 1px solid var(--paper); outline-offset: -1px; }
+.seg--fold { background: var(--fire-1); }
+.seg--call { background: #4fb3a9; }
+.seg--half { background: var(--fire-3); }
+.seg--pot { background: var(--fire-2); }
+.seg--allin { background: var(--fire-4); }
+.thought__odds { font: 400 calc(var(--u) * 1.15) var(--mono); color: var(--graphite); }
+
+.next {
+  padding: var(--u) calc(var(--u) * 2.4);
+  min-height: 44px;
+  background: var(--fire-3);
+  color: var(--slide);
+  border: 0;
+  font: 700 calc(var(--u) * 1.5) var(--body);
+  cursor: pointer;
+}
+
+.unit { font-family: var(--mono); font-size: 0.8em; }
+.graph__marker { stroke: var(--paper); stroke-width: 1.5; stroke-dasharray: 2 3; }
+
+/* ── The specimen ───────────────────────────────────── */
+
+.credit {
+  position: absolute;
+  left: var(--gap);
+  right: var(--gap);
+  bottom: calc(var(--gap) + var(--u) * 4.5);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 1.1);
+  color: var(--graphite);
+}
+.credit a { color: var(--paper); }
+
+/* ── Phones and narrow windows: everything in one column ── */
+
+@media (max-width: 900px) {
+  .play {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto clamp(300px, 92vw, 60vh) auto 60vh;
+    grid-template-areas: "head" "game" "bar" "specimen";
+  }
+  .masthead { padding: var(--gap) 16px 0; }
+  .play { --u: clamp(9px, 2.4vw, 13px); }
+  .bar { grid-template-columns: minmax(0, 1fr); padding: var(--gap) 16px; }
+  .specimen { border-left: 0; border-top: 1px solid var(--coverslip-edge); }
+  .lens-toggle { bottom: var(--u); right: 16px; }
+}
+
+@media (max-width: 560px) {
+  .masthead { flex-direction: column; }
+  .score { text-align: left; display: flex; align-items: baseline; gap: var(--u); }
+  .score .hud__label { margin: 0; }
+  .score .counter { font-size: calc(var(--u) * 2.6); }
+  .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

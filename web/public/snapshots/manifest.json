@@ -1,0 +1,164 @@
+{
+  "generated": "2026-10-02T10:13:01-0400",
+  "arms": {
+    "real": {
+      "dim": 1316,
+      "snapshots": [
+        {
+          "hands": 0,
+          "file": "real/h000000000.f32"
+        },
+        {
+          "hands": 10000,
+          "file": "real/h000010000.f32"
+        },
+        {
+          "hands": 20000,
+          "file": "real/h000020000.f32"
+        },
+        {
+          "hands": 30000,
+          "file": "real/h000030000.f32"
+        },
+        {
+          "hands": 50000,
+          "file": "real/h000050000.f32"
+        },
+        {
+          "hands": 80000,
+          "file": "real/h000080000.f32"
+        },
+        {
+          "hands": 110000,
+          "file": "real/h000110000.f32"
+        },
+        {
+          "hands": 170000,
+          "file": "real/h000170000.f32"
+        },
+        {
+          "hands": 260000,
+          "file": "real/h000260000.f32"
+        },
+        {
+          "hands": 390000,
+          "file": "real/h000390000.f32"
+        },
+        {
+          "hands": 580000,
+          "file": "real/h000580000.f32"
+        },
+        {
+          "hands": 870000,
+          "file": "real/h000870000.f32"
+        }
+      ]
+    },
+    "shuffled": {
+      "dim": 1316,
+      "snapshots": [
+        {
+          "hands": 0,
+          "file": "shuffled/h000000000.f32"
+        },
+        {
+          "hands": 10000,
+          "file": "shuffled/h000010000.f32"
+        },
+        {
+          "hands": 20000,
+          "file": "shuffled/h000020000.f32"
+        },
+        {
+          "hands": 30000,
+          "file": "shuffled/h000030000.f32"
+        },
+        {
+          "hands": 50000,
+          "file": "shuffled/h000050000.f32"
+        },
+        {
+          "hands": 80000,
+          "file": "shuffled/h000080000.f32"
+        },
+        {
+          "hands": 120000,
+          "file": "shuffled/h000120000.f32"
+        },
+        {
+          "hands": 180000,
+          "file": "shuffled/h000180000.f32"
+        },
+        {
+          "hands": 260000,
+          "file": "shuffled/h000260000.f32"
+        },
+        {
+          "hands": 400000,
+          "file": "shuffled/h000400000.f32"
+        },
+        {
+          "hands": 600000,
+          "file": "shuffled/h000600000.f32"
+        },
+        {
+          "hands": 900000,
+          "file": "shuffled/h000900000.f32"
+        }
+      ]
+    },
+    "nobrain": {
+      "dim": 131,
+      "snapshots": [
+        {
+          "hands": 0,
+          "file": "nobrain/h000000000.f32"
+        },
+        {
+          "hands": 10000,
+          "file": "nobrain/h000010000.f32"
+        },
+        {
+          "hands": 20000,
+          "file": "nobrain/h000020000.f32"
+        },
+        {
+          "hands": 30000,
+          "file": "nobrain/h000030000.f32"
+        },
+        {
+          "hands": 50000,
+          "file": "nobrain/h000050000.f32"
+        },
+        {
+          "hands": 80000,
+          "file": "nobrain/h000080000.f32"
+        },
+        {
+          "hands": 120000,
+          "file": "nobrain/h000120000.f32"
+        },
+        {
+          "hands": 180000,
+          "file": "nobrain/h000180000.f32"
+        },
+        {
+          "hands": 260000,
+          "file": "nobrain/h000260000.f32"
+        },
+        {
+          "hands": 400000,
+          "file": "nobrain/h000400000.f32"
+        },
+        {
+          "hands": 600000,
+          "file": "nobrain/h000600000.f32"
+        },
+        {
+          "hands": 900000,
+          "file": "nobrain/h000900000.f32"
+        }
+      ]
+    }
+  }
+}

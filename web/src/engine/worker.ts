@@ -5,7 +5,7 @@
 //   w.postMessage({ type: "newHand", seed: 42, humanSeat: 1 });
 //   w.postMessage({ type: "act", action: 1 });
 //
-// Replies: { type: "loaded", ... } | { type: "events", events, frames } | { type: "error", message }.
+// Replies: { type: "progress", loaded, total } (connectome download) | { type: "loaded", ... } | { type: "events", events, frames } | { type: "error", message }.
 // frames (when options.frames) are whole-brain activity bytes, one per dynamics step, transferred.
 
 import { BRAIN_PARAMS, Brain, fetchConnectome, type Connectome } from "./connectome";
@@ -20,6 +20,7 @@ export type Request =
   | { type: "act"; action: number };
 
 export type Reply =
+  | { type: "progress"; loaded: number; total: number }
   | { type: "loaded"; arm: Arm; neurons: number; readoutDim: number; ms: number }
   | { type: "events"; events: GameEvent[]; frames: ArrayBuffer[]; ms: number }
   | { type: "error"; message: string };
@@ -39,7 +40,10 @@ async function handle(req: Request): Promise<void> {
     let brain: Brain | null = null;
     if (req.arm !== "nobrain") {
       const url = req.connectomeUrl ?? `data/connectome-${req.arm}.bin`;
-      if (!connectomes.has(url)) connectomes.set(url, fetchConnectome(url));
+      if (!connectomes.has(url)) {
+        const progress = (loaded: number, total: number) => scope.postMessage({ type: "progress", loaded, total });
+        connectomes.set(url, fetchConnectome(url, progress));
+      }
       brain = new Brain(await connectomes.get(url)!, BRAIN_PARAMS);
     }
     const readout = await fetchReadout(req.snapshotUrl);

@@ -2,7 +2,8 @@
 
     uv run python tools/export_snapshots.py [--runs DIR] [--out DIR] [--points N]
 
-Writes web/public/snapshots/<arm>/h<hands>.f32 and web/public/snapshots/manifest.json. Each .f32 is
+Writes web/public/snapshots/<arm>/h<hands>.f32, manifest.json, and training.json (the real fly's
+training log, for the page's chart). Each .f32 is
 little-endian float32: W (dim x 5, row-major), b (5), mu (dim), sd (dim). Read-only on runs/.
 """
 
@@ -59,6 +60,23 @@ def main() -> None:
         manifest["arms"][arm] = {"dim": dim, "snapshots": entries}
         print(f"{arm}: {len(entries)} snapshots, latest {entries[-1]['hands']:,} hands")
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    write_training(args.runs / "real" / "log.jsonl", args.out / "training.json")
+
+
+def write_training(log: Path, out: Path, max_points: int = 240) -> None:
+    """The real fly's training log, thinned, for the page's winnings chart.
+
+    bb100 per bot is in big blinds per 100 hands; at the page's $1 big blind that is also
+    dollars per 100 hands.
+    """
+    rows = [json.loads(ln) for ln in log.read_text().splitlines()]
+    step = max(1, len(rows) // max_points)
+    series = [
+        {"hands": r["hands"], "bb100": {k: round(v, 1) for k, v in r["bb100"].items()}}
+        for r in rows[::-1][::step][::-1]
+    ]
+    out.write_text(json.dumps({"series": series}) + "\n")
+    print(f"training: {len(series)} points")
 
 
 if __name__ == "__main__":
