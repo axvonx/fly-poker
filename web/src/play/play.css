@@ -206,6 +206,8 @@
 
 /* ── The specimen ───────────────────────────────────── */
 
+.specimen__title { font: 700 calc(var(--u) * 2) var(--display); color: var(--paper); margin-bottom: calc(var(--u) * 0.3); }
+
 .links {
   position: absolute;
   top: calc(var(--gap) - 4px);
