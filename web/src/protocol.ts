@@ -22,13 +22,6 @@ export const OPPONENT_LABEL: Record<Opponent, string> = {
   slumbot: "Slumbot",
 };
 
-export const OPPONENT_BLURB: Record<Opponent, string> = {
-  random: "Picks any legal move",
-  station: "Never folds, never raises",
-  maniac: "Raises every chance it gets",
-  equity: "Bets by its odds of winning",
-  slumbot: "A strong research poker AI",
-};
 
 export interface Meta {
   neurons: number;
@@ -46,12 +39,29 @@ export interface EvalPoint {
   pairs: number;
 }
 
+/** One training-log interval of the real fly: winnings per bot over those hands. */
+export interface TrainingPoint {
+  hands: number;
+  bb100: Partial<Record<Opponent, number>>;
+  entropy: number;
+}
+
+/** Each bot's colour: its robot on the table and its line on the training graph. */
+export const OPPONENT_COLOR: Record<Opponent, string> = {
+  random: "#6c8ebf",
+  station: "#4fb3a9",
+  maniac: "#d1495b",
+  equity: "#edae49",
+  slumbot: "#9d8bd0",
+};
+
 export type Message =
   | {
       type: "stats";
       real?: { hands: number; hands_per_sec: number };
       shuffled?: { hands: number; hands_per_sec: number };
       nobrain?: { hands: number; hands_per_sec: number };
+      series?: TrainingPoint[];
       eval: EvalPoint[];
     }
   | { type: "hand"; opponent: Opponent; fly_button: boolean; fly_cards: string[]; snapshot_hands: number }

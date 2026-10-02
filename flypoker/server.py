@@ -23,8 +23,8 @@ WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 
 # Seconds to hold after each kind of event, so a hand reads at human pace from across a gym.
 PACE = {
-    "hand": 1.5,
-    "board": 1.2,
+    "hand": 2.6,  # blinds + four dealt cards animate on the table
+    "board": 1.7,  # bets sweep to the pot, then up to three cards deal
     "action": 1.3,
     "thinking": 0.3,
     "frame": 0.16,

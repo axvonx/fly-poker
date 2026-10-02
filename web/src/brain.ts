@@ -56,6 +56,7 @@ export class BrainView {
   private target: Float32Array;
   private activityAttr: THREE.BufferAttribute;
   private height: number;
+  private width: number;
   private last = performance.now();
   private reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -85,6 +86,7 @@ export class BrainView {
       pos[3 * i + 2] = xyz[3 * i + 1] - cy;
     }
     this.height = (maxZ - minZ) * 1.06;
+    this.width = (maxX - minX) * 1.06;
 
     const isReadout = new Float32Array(n);
     for (const i of readout) isReadout[i] = 1;
@@ -114,7 +116,7 @@ export class BrainView {
     this.scene.add(this.group);
 
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -2000, 2000);
-    this.umPerPixel = () => this.height / canvas.clientHeight;
+    this.umPerPixel = () => (this.camera.top - this.camera.bottom) / canvas.clientHeight;
 
     new ResizeObserver(() => {
       this.resize();
@@ -138,7 +140,8 @@ export class BrainView {
   private resize(): void {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     this.renderer.setSize(w, h, false);
-    const halfH = this.height / 2, halfW = (halfH * w) / h;
+    // Fit the whole nervous system, whichever dimension binds.
+    const halfH = Math.max(this.height / 2, (this.width / 2) * (h / w)), halfW = (halfH * w) / h;
     Object.assign(this.camera, { left: -halfW, right: halfW, top: halfH, bottom: -halfH });
     this.camera.updateProjectionMatrix();
   }

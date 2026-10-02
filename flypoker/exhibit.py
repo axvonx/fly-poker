@@ -129,8 +129,8 @@ def _board(h: Hand) -> list[str]:
     return [f"{c[0].rank}{c[0].suit}" for c in h.state.board_cards]
 
 
-def run_stats() -> dict:
-    """Hands played and recent training-log returns per arm, for the side rail."""
+def run_stats(max_points: int = 240) -> dict:
+    """Hands played per arm, plus the real fly's training-log series for the live graph."""
     out = {}
     for arm in ("real", "shuffled", "nobrain"):
         log = RUNS / arm / "log.jsonl"
@@ -139,6 +139,13 @@ def run_stats() -> dict:
         lines = log.read_text().splitlines()
         last = json.loads(lines[-1]) if lines else {"hands": 0, "hands_per_sec": 0}
         out[arm] = {"hands": last["hands"], "hands_per_sec": last.get("hands_per_sec", 0)}
+        if arm == "real":
+            step = max(1, len(lines) // max_points)
+            rows = [json.loads(ln) for ln in lines]
+            out["series"] = [
+                {"hands": r["hands"], "bb100": r["bb100"], "entropy": r["entropy"]}
+                for r in rows[::-1][::step][::-1]
+            ]
     ev = RUNS / "real" / "eval.jsonl"
     out["eval"] = [json.loads(ln) for ln in ev.read_text().splitlines()] if ev.exists() else []
     return out
