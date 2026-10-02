@@ -228,9 +228,11 @@ export function markShowdown(cards: Map<string, Card>, winners: MadeHand[], lose
 /** The result line under the table: "The fly wins $50", the name in its seat's colour and the
  * amount green or red for whoever's side this screen is on. who = null means a split pot. */
 export function showVerdict(el: HTMLElement, who: { name: string; color: string } | null, amount: string, good: boolean, exclaim = false): void {
-  el.replaceChildren();
+  const inner = document.createElement("span");
+  inner.className = "verdict__inner"; // pops from its own centre; el's transform positions it
+  el.replaceChildren(inner);
   if (!who) {
-    el.textContent = "Split pot";
+    inner.textContent = "Split pot";
   } else {
     const name = document.createElement("span");
     name.className = "verdict__who";
@@ -239,7 +241,7 @@ export function showVerdict(el: HTMLElement, who: { name: string; color: string 
     const money = document.createElement("span");
     money.className = `verdict__amount ${good ? "is-good" : "is-bad"}`;
     money.textContent = amount;
-    el.append(name, document.createTextNode(who.name === "You" ? " win " : " wins "), money, document.createTextNode(exclaim ? "!" : ""));
+    inner.append(name, document.createTextNode(who.name === "You" ? " win " : " wins "), money, document.createTextNode(exclaim ? "!" : ""));
   }
   el.classList.remove("is-shown");
   void el.offsetWidth; // restart the entrance animation

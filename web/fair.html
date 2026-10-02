@@ -12,12 +12,13 @@
     <main class="stage">
       <section class="game" aria-label="The hand being played">
         <h1 class="title">A fruit fly's nervous system, playing poker</h1>
-        <div class="played">
-          <p class="hud__label">Hands played</p>
+        <div class="tally tally--hands">
           <p class="counter" id="hands">—</p>
-          <p class="hud__label winnings__label">The fly's winnings</p>
-          <p class="counter counter--money" id="winnings">$0</p>
-          <p class="winnings__since">since the millionth hand</p>
+          <p class="tally__note">hands played</p>
+        </div>
+        <div class="tally tally--money">
+          <p class="counter" id="winnings">$0</p>
+          <p class="tally__note">since the millionth hand</p>
         </div>
         <button class="lens-toggle" id="lens" type="button" aria-pressed="false">Fly's-eye view <kbd>F</kbd></button>
         <canvas id="table"></canvas>
