@@ -24,7 +24,7 @@ async function boot(): Promise<void> {
   const meta: Meta = await (await fetch("/api/meta")).json();
   const buf = await (await fetch("/api/neurons")).arrayBuffer();
   const xyz = new Float32Array(buf, 0, meta.neurons * 3);
-  $("specimen-meta").textContent = `MaleCNS v1.0 · ${meta.neurons.toLocaleString()} neurons`;
+  $("specimen-meta").textContent = `${meta.neurons.toLocaleString()} neurons`;
 
   const scale = () => {
     ($("scalebar").querySelector(".scalebar__bar") as HTMLElement).style.width = `${100 / brain.umPerPixel()}px`;

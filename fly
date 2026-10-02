@@ -258,8 +258,8 @@ watch_once() {
     rm -f "$STATE/alert-battery-20" "$STATE/alert-battery-10"
   fi
 
-  # Publish every EVERY hands of the real fly.
-  if [ "$(latest_snapshot_hands real)" -ge $(( $(published_hands) + EVERY )) ]; then
+  # Publish at each multiple of EVERY hands of the real fly (so 50k steps land on 1,000,000).
+  if [ "$(latest_snapshot_hands real)" -ge $(( ($(published_hands) / EVERY + 1) * EVERY )) ]; then
     cmd_publish >/dev/null
   fi
 

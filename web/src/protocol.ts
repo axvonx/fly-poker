@@ -15,10 +15,10 @@ export const OPPONENTS = ["random", "station", "maniac", "equity", "slumbot"] as
 export type Opponent = (typeof OPPONENTS)[number];
 
 export const OPPONENT_LABEL: Record<Opponent, string> = {
-  random: "Random",
-  station: "Calling station",
-  maniac: "Maniac",
-  equity: "Equity bot",
+  random: "Random Bot",
+  station: "Calling Station Bot",
+  maniac: "Maniac Bot",
+  equity: "Equity Bot",
   slumbot: "Slumbot",
 };
 

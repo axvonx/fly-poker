@@ -1,20 +1,8 @@
-// The HUD under the table: the fly's own cards, large enough to read from across the gym,
-// and the five readout bars it chooses from.
+// The HUD under the table: the five readout bars the fly chooses from.
 
 import { ACTIONS, ACTION_LABEL, type Action, type Message } from "./protocol";
 
-const SUIT_GLYPH: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
-const SUIT_NAME: Record<string, string> = { s: "spades", h: "hearts", d: "diamonds", c: "clubs" };
 const $ = (id: string) => document.getElementById(id)!;
-
-function card(code: string): HTMLElement {
-  const el = document.createElement("span");
-  const rank = code[0] === "T" ? "10" : code[0], suit = code[1];
-  el.className = `card card--${suit === "h" || suit === "d" ? "red" : "black"}`;
-  el.setAttribute("aria-label", `${rank} of ${SUIT_NAME[suit]}`);
-  el.innerHTML = `<span class="card__rank">${rank}</span><span class="card__suit">${SUIT_GLYPH[suit]}</span>`;
-  return el;
-}
 
 export class Hud {
   private bars = new Map<Action, { row: HTMLElement; fill: HTMLElement; value: HTMLElement }>();
@@ -34,7 +22,6 @@ export class Hud {
 
   handle(m: Message): void {
     if (m.type === "hand") {
-      $("fly-cards").replaceChildren(...m.fly_cards.map(card));
       this.reset();
     } else if (m.type === "thinking") {
       this.reset(m.legal);

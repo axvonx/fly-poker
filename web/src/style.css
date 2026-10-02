@@ -120,7 +120,7 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 0.35em; border: 1p
 .hud {
   grid-area: hud;
   display: grid;
-  grid-template-columns: auto minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: calc(var(--gap) * 2);
   align-items: start;
   padding: var(--gap);
@@ -218,6 +218,7 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 0.35em; border: 1p
 }
 
 .specimen__meta { position: absolute; top: 0; left: 0; }
+.specimen__title { font: 700 calc(var(--u) * 2) var(--display); color: var(--paper); margin-bottom: calc(var(--u) * 0.3); }
 
 .scalebar { position: absolute; left: 0; bottom: 0; display: grid; gap: calc(var(--u) * 0.5); }
 .scalebar__bar { height: 3px; background: var(--paper); }
