@@ -33,6 +33,7 @@ export class Bar {
   /** Your turn: label each legal choice with what it costs. amounts[a] is the street total it bets to. */
   turn(o: Obs, amounts: number[]): void {
     this.show("actions");
+    $("actions").classList.add("is-turn");
     ACTIONS.forEach((a, i) => {
       const b = this.buttons[i];
       b.disabled = !o.legal[i];
@@ -54,6 +55,7 @@ export class Bar {
   /** Not your turn: buttons stay in place, greyed out. */
   wait(): void {
     this.show("actions");
+    $("actions").classList.remove("is-turn");
     this.disable();
   }
 

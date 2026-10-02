@@ -100,7 +100,12 @@ body.is-mobile { overflow: hidden; overscroll-behavior: none; }
 .btn__detail { font: 400 calc(var(--u) * 1.15) var(--mono); color: var(--graphite); }
 .btn__detail:empty { display: none; }
 .dock__btn:disabled { opacity: 0.35; }
-.dock__btn--fold:not(:disabled) { color: var(--fire-2); }
+/* Buttons look like buttons: Check/Call filled gold, Raise outlined gold, Fold outlined red. */
+.dock__btn:not(:disabled) { border: 2px solid var(--fire-3); }
+.dock__btn--call:not(:disabled) { background: var(--fire-3); color: var(--slide); }
+.dock__btn--call:not(:disabled) .btn__detail { color: var(--slide); }
+.dock__btn--fold:not(:disabled) { color: var(--fire-2); border-color: var(--fire-2); }
+.dock.is-turn .dock__btn:not(:disabled) { animation: turn-glow 1.4s ease-in-out 3; }
 .dock__btn:not(:disabled):active, .pick__btn:active { transform: scale(0.97); }
 .dock__btn--raise[aria-expanded="true"] { border-color: var(--fire-3); color: var(--fire-3); }
 .pick { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; animation: rise 180ms ease-out; }

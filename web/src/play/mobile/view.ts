@@ -12,6 +12,7 @@ import type { PlayController, PlayView } from "../controller";
 import { buildHowTo } from "../howto";
 import { signedDollars } from "../money";
 import { PlayTable } from "../table";
+import { runIntro } from "../intro";
 import { renderThoughts, type FlyThought } from "../thoughts";
 import { Dock } from "./dock";
 import "./mobile.css";
@@ -31,6 +32,7 @@ export class MobileView implements PlayView {
   private pill: HandPanel;
   private dock!: Dock;
   private sheet: HTMLDialogElement;
+  private introduced = false;
   private q = <T extends HTMLElement = HTMLElement>(sel: string) => this.root.querySelector(sel) as T;
 
   constructor(private data: BootData) {
@@ -150,6 +152,14 @@ export class MobileView implements PlayView {
 
   turn(o: Obs, amounts: number[]): void {
     this.dock.turn(o, amounts);
+    if (!this.introduced) {
+      this.introduced = true; // once per load, at your first move (cards dealt, buttons live)
+      void runIntro([
+        { rect: () => this.table.screenRect("fly"), text: "This is the fly, an AI built off a real brain" },
+        { rect: () => this.table.screenRect("cards"), text: "These are your cards" },
+        { rect: () => this.q(".dock__row").getBoundingClientRect(), text: "These are your actions, tap these" },
+      ]);
+    }
   }
 
   wait(): void {

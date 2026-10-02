@@ -8,6 +8,7 @@ import type { BootData } from "./boot";
 import { Chart } from "./chart";
 import type { PlayController, PlayView } from "./controller";
 import { buildHowTo } from "./howto";
+import { runIntro } from "./intro";
 import { signedDollars } from "./money";
 import { PlayTable } from "./table";
 import { renderThoughts, type FlyThought } from "./thoughts";
@@ -22,6 +23,7 @@ export class DesktopView implements PlayView {
   private chart: Chart;
   private bar!: Bar;
   private slider = $("practice") as HTMLInputElement;
+  private introduced = false;
 
   constructor(private data: BootData) {
     $("specimen-meta").textContent = `${data.site.neurons.toLocaleString()} neurons`;
@@ -80,6 +82,14 @@ export class DesktopView implements PlayView {
 
   turn(o: Obs, amounts: number[]): void {
     this.bar.turn(o, amounts);
+    if (!this.introduced) {
+      this.introduced = true; // once per load, at your first move (cards dealt, buttons live)
+      void runIntro([
+        { rect: () => this.table.screenRect("fly"), text: "This is the fly, an AI built off a real brain" },
+        { rect: () => this.table.screenRect("cards"), text: "These are your cards" },
+        { rect: () => $("actions").getBoundingClientRect(), text: "These are your actions, click these" },
+      ]);
+    }
   }
 
   wait(): void {

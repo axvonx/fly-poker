@@ -100,7 +100,14 @@
 .act:active:not(:disabled) { transform: translateY(0); }
 .act:focus-visible, .next:focus-visible, .how:focus-visible { outline: 2px solid var(--fire-3); outline-offset: 2px; }
 .act:disabled { opacity: 0.35; cursor: default; }
-.act--fold:not(:disabled) { color: var(--fire-2); }
+/* Buttons look like buttons (play-testers took the cards for the controls): Check/Call is filled
+   gold, the raises are outlined gold, Fold is outlined red; on your turn they glow. */
+.act:not(:disabled) { border: 2px solid var(--fire-3); }
+.act--call:not(:disabled) { background: var(--fire-3); color: var(--slide); }
+.act--call:not(:disabled) .act__detail { color: var(--slide); }
+.act--fold:not(:disabled) { color: var(--fire-2); border-color: var(--fire-2); }
+.actions__row.is-turn .act:not(:disabled) { animation: turn-glow 1.4s ease-in-out 3; }
+@keyframes turn-glow { 50% { box-shadow: 0 0 18px 2px rgb(247 181 56 / 0.55); } }
 
 .hand-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--gap); }
 
@@ -292,4 +299,30 @@
 /* Phones get the mobile view (play/mobile/), which replaces this markup at load: don't flash it. */
 @media (max-width: 700px) {
   main.play { visibility: hidden; }
+}
+
+/* ── The intro: a spotlight on the fly, your cards, your actions ── */
+.intro { position: fixed; inset: 0; z-index: 60; cursor: pointer; opacity: 0; transition: opacity 300ms; touch-action: none; }
+.intro.is-shown { opacity: 1; }
+.intro.is-leaving { opacity: 0; }
+.intro__hole {
+  position: fixed;
+  border-radius: 18px;
+  box-shadow: 0 0 0 2px var(--fire-3), 0 0 36px 8px rgb(247 181 56 / 0.4), 0 0 0 200vmax rgb(5 4 8 / 0.8);
+  transition: left 550ms cubic-bezier(0.2, 0.8, 0.2, 1), top 550ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 550ms cubic-bezier(0.2, 0.8, 0.2, 1), height 550ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+.intro__text {
+  position: fixed;
+  margin: 0;
+  text-align: center;
+  font: 700 clamp(20px, 3.2vmin, 30px) / 1.15 var(--display);
+  color: var(--paper);
+  opacity: 0;
+}
+.intro__text.is-shown { opacity: 1; transition: opacity 300ms 250ms; }
+@media (prefers-reduced-motion: reduce) {
+  .intro__hole { transition: none; }
+  .actions__row.is-turn .act:not(:disabled) { animation: none; }
 }

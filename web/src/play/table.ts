@@ -68,6 +68,7 @@ export class PlayTable {
   private camera = new THREE.PerspectiveCamera(42, 1, 0.1, 50);
   private cards: Card[] = [];
   private flyCards: Card[] = [];
+  private yourCards: Card[] = [];
   private board: Card[] = [];
   private bets: Record<Seat, { amount: number; stack: THREE.Group | null }> = {
     you: { amount: 0, stack: null },
@@ -151,6 +152,22 @@ export class PlayTable {
     this.fly.thinking(level);
   }
 
+  /** Where the fly (or your cards) is on screen, in page pixels; null before your cards are dealt. */
+  screenRect(what: "fly" | "cards"): DOMRect | null {
+    const box = new THREE.Box3();
+    if (what === "fly") box.setFromObject(this.fly.group);
+    else if (this.yourCards.length) for (const c of this.yourCards) box.expandByObject(c.group);
+    else return null;
+    const c = this.canvas.getBoundingClientRect();
+    let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+      const v = new THREE.Vector3(x, y, z).project(this.camera);
+      const px = c.left + ((v.x + 1) / 2) * c.width, py = c.top + ((1 - v.y) / 2) * c.height;
+      [x0, y0, x1, y1] = [Math.min(x0, px), Math.min(y0, py), Math.max(x1, px), Math.max(y1, py)];
+    }
+    return new DOMRect(x0, y0, x1 - x0, y1 - y0);
+  }
+
   setLens(on: boolean): void {
     this.lens = on;
   }
@@ -182,6 +199,7 @@ export class PlayTable {
         this.labels.pot.textContent = `Pot ${dollars(150)}`;
         for (let i = 0; i < 2; i++) {
           const mine = this.deal(e.human_cards[i]);
+          this.yourCards.push(mine);
           await mine.moveTo(new THREE.Vector3(-0.36 + i * 0.72, 0.01 + i * 0.002, this.L.seat.you), true);
           const theirs = this.deal(null);
           this.flyCards.push(theirs);
@@ -323,6 +341,7 @@ export class PlayTable {
     for (const s of [this.bets.you.stack, this.bets.fly.stack, this.pot.stack]) if (s) this.scene.remove(s);
     this.cards = [];
     this.flyCards = [];
+    this.yourCards = [];
     this.board = [];
     this.faces.clear();
     this.boardCodes = [];

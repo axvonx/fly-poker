@@ -10,7 +10,7 @@ export class Dock {
   readonly el = document.createElement("nav");
   private picker = document.createElement("div");
   private fold = button("Fold", "dock__btn dock__btn--fold");
-  private call = button("Call", "dock__btn");
+  private call = button("Call", "dock__btn dock__btn--call");
   private raise = button("Raise ▴", "dock__btn dock__btn--raise");
   private next = button("Next hand →", "dock__next");
   private sizes = [HALF, POT, ALLIN].map((a) => ({ a, el: button("", "pick__btn") }));
@@ -47,6 +47,7 @@ export class Dock {
   /** Your move: label each choice with what it costs. amounts[a] is the street total it bets to. */
   turn(o: Obs, amounts: number[]): void {
     this.show("act");
+    this.el.classList.add("is-turn");
     this.fold.disabled = !o.legal[FOLD];
     this.call.disabled = !o.legal[CALL];
     setLabel(this.call, o.to_call ? "Call" : "Check", o.to_call ? dollars(o.to_call) : "");
@@ -67,6 +68,7 @@ export class Dock {
   /** Not your move: everything in place, greyed out. */
   wait(): void {
     this.show("act");
+    this.el.classList.remove("is-turn");
     for (const b of [this.fold, this.call, this.raise]) b.disabled = true;
   }
 
