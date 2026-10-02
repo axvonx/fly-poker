@@ -52,7 +52,7 @@ jobs:
             --pattern 'neurons.bin' --pattern 'site.json'
           ls -l public/data
       - run: pnpm test # golden parity, including the fly cases now that the connectomes are here
-      - name: Build (relative base: the site is served from /<repo>/)
+      - name: "Build (relative base: the site is served from /<repo>/)"
         run: pnpm exec tsc --noEmit && pnpm exec vite build --base ./
       - uses: actions/upload-pages-artifact@v3
         with:
