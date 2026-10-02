@@ -11,19 +11,16 @@
       <header class="masthead">
         <div class="masthead__text">
           <h1 class="title">Play poker against a fruit fly's brain</h1>
-          <p class="story">
-            Its wiring is a real fly's (166,700 neurons, frozen). Only how we read its decisions was trained.
-          </p>
           <label class="practice">
-            <span>Playing the fly after</span>
-            <input id="practice" type="range" min="0" max="0" step="1" value="0" aria-describedby="practice-out" />
-            <output id="practice-out"><span id="practice-hands">—</span> hands of practice</output>
+            <span class="practice__label">Practice</span>
+            <input id="practice" type="range" min="0" max="0" step="1" value="0" />
+            <output id="practice-hands">—</output>
           </label>
         </div>
         <div class="score" aria-live="polite">
           <p class="hud__label">You vs the fly</p>
           <p class="counter" id="score-value">$0</p>
-          <p class="score__detail" id="score-detail">over 0 hands</p>
+          <p class="score__detail" id="score-detail"></p>
         </div>
       </header>
 
@@ -32,26 +29,35 @@
         <canvas id="table"></canvas>
         <div class="tags" id="tags" aria-live="polite"></div>
         <div class="loading" id="loading" role="status">
-          <p id="loading-text">Downloading the fly's brain…</p>
+          <p id="loading-text">Loading the fly's brain…</p>
           <span class="loading__track"><span class="loading__fill" id="loading-fill"></span></span>
-          <p class="loading__note">About 16 MB, once. After that everything runs in your browser.</p>
         </div>
       </section>
 
       <section class="bar" aria-label="Your move">
         <div class="bar__main">
-          <div id="bar-actions">
-            <p class="hud__label" id="bar-status">Loading…</p>
-            <div class="actions" id="actions"></div>
+          <div id="bar-actions" class="actions" role="group" aria-label="Your move">
+            <div class="actions__row" id="actions"></div>
           </div>
-          <div id="bar-recap" hidden>
-            <p class="hud__label"><span id="recap-verdict"></span> What the fly was thinking:</p>
-            <ol class="recap" id="recap-list"></ol>
+          <div id="bar-recap" class="recap" hidden>
+            <p class="hud__label">The fly's thinking</p>
+            <ol class="recap__list" id="recap-list"></ol>
             <button class="next" id="next" type="button">Next hand</button>
+          </div>
+          <div class="hand-row">
+            <div class="hand" aria-live="polite">
+              <p class="hand__name" id="hand-name"></p>
+              <p class="hand__detail" id="hand-detail"></p>
+              <div class="hand__meter" id="hand-meter" hidden title="How often this hand beats a random hand, from here">
+                <span class="hand__track"><span class="hand__fill" id="hand-fill"></span></span>
+                <span class="hand__chance"><span id="hand-chance"></span> vs a random hand</span>
+              </div>
+            </div>
+            <button class="how" id="how" type="button">How to play</button>
           </div>
         </div>
         <div class="hud__training">
-          <p class="hud__label">How this fly did against practice bots <span class="unit">($ per 100 hands)</span></p>
+          <p class="hud__label">Training vs bots <span class="unit">$/100 hands</span></p>
           <svg id="training-graph" viewBox="0 0 360 90" role="img" aria-label="Winnings against each practice bot during training, with a marker at the fly you are playing"></svg>
           <ul class="legend" id="legend"></ul>
         </div>
@@ -60,17 +66,36 @@
       <aside class="specimen" aria-label="The fly's nervous system">
         <canvas id="brain"></canvas>
         <div class="specimen__overlay" aria-hidden="true">
-          <p class="specimen__meta" id="specimen-meta">MaleCNS v1.0 · 166,700 neurons</p>
+          <p class="specimen__meta" id="specimen-meta">166,700 neurons</p>
           <div class="scalebar" id="scalebar"><span class="scalebar__bar"></span><span class="scalebar__text">100 µm</span></div>
           <div class="lut"><span class="lut__ramp"></span><span class="lut__text">resting</span><span class="lut__text">firing</span></div>
         </div>
-        <p class="credit">
-          Connectome: <a href="https://www.janelia.org/project-team/flyem">MaleCNS v1.0</a> by FlyEM (HHMI Janelia),
-          Cambridge &amp; Google, CC-BY 4.0 ·
-          <a href="https://github.com/axvonx/fly-poker">Code on GitHub</a>
-        </p>
+        <nav class="links" aria-label="Credits">
+          <a href="https://www.janelia.org/project-team/flyem" title="Connectome: MaleCNS v1.0 by FlyEM (HHMI Janelia), University of Cambridge and Google. CC-BY 4.0">MaleCNS v1.0</a>
+          <a href="https://github.com/axvonx/fly-poker" title="Code on GitHub" aria-label="Code on GitHub">
+            <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          </a>
+        </nav>
       </aside>
     </main>
+
+    <dialog class="sheet" id="how-sheet" aria-labelledby="how-title">
+      <form method="dialog" class="sheet__close"><button aria-label="Close">✕</button></form>
+      <h2 id="how-title">How to play</h2>
+      <ol class="steps">
+        <li><b>2 cards each</b>, face down. Then <b>5 shared cards</b>: 3, 1, 1.</li>
+        <li>Each round: <b>check, call, raise</b> — or <b>fold</b> and give up the pot.</li>
+        <li><b>Best 5 cards</b> from your 2 + the shared 5 wins.</li>
+      </ol>
+      <h3>Hands, strongest first <span class="unit">how often by the river</span></h3>
+      <ol class="ranks" id="ranks"></ol>
+      <p class="sheet__foot">
+        The fly is 166,700 real neurons from the
+        <a href="https://www.janelia.org/project-team/flyem">MaleCNS v1.0</a> connectome (FlyEM / HHMI Janelia,
+        Cambridge, Google; CC-BY 4.0). Its wiring is frozen; only how we read its decisions was trained.
+        <a href="https://github.com/axvonx/fly-poker">Code</a>.
+      </p>
+    </dialog>
     <script type="module" src="/src/play/main.ts"></script>
   </body>
 </html>

@@ -14,16 +14,20 @@ import "./play.css";
 
 import { BrainView } from "../brain";
 import { gunzip, isGzip } from "../engine/connectome";
+import { DECK } from "../engine/poker";
+import { winChance } from "../hands";
 import type { GameEvent } from "../engine/game";
 import type { Reply, Request } from "../engine/worker";
 import { Bar, type FlyThought } from "./bar";
 import { Chart, type TrainingSeries } from "./chart";
-import { dollars, signedDollars } from "./money";
+import { buildHowTo } from "./howto";
+import { signedDollars } from "./money";
 import { PlayTable } from "./table";
 
 const $ = (id: string) => document.getElementById(id)!;
 const url = (path: string) => new URL(path, document.baseURI).href; // the worker resolves URLs against its own script
 const FRAME_MS = 90; // one brain timestep on screen
+const short = (n: number) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n));
 const STREET_OF_BOARD: Record<number, number> = { 0: 0, 3: 1, 4: 2, 5: 3 };
 
 interface Manifest {
@@ -81,7 +85,7 @@ async function boot(): Promise<void> {
   // The brain view starts while the connectome downloads: it only needs positions.
   const neurons = await fetchBytes("data/neurons.bin");
   const xyz = new Float32Array(neurons.buffer, neurons.byteOffset, site.neurons * 3);
-  $("specimen-meta").textContent = `MaleCNS v1.0 · ${site.neurons.toLocaleString()} neurons`;
+  $("specimen-meta").textContent = `${site.neurons.toLocaleString()} neurons`;
   const scale = () => {
     ($("scalebar").querySelector(".scalebar__bar") as HTMLElement).style.width = `${100 / brain.umPerPixel()}px`;
   };
@@ -89,6 +93,13 @@ async function boot(): Promise<void> {
   await fonts;
   const table = new PlayTable($("table") as HTMLCanvasElement, $("tags"));
   const chart = new Chart(training);
+  table.onHand = (h, hole, board) => bar.hand(h, winChance(hole, board, DECK));
+
+  // ── how to play ──
+  buildHowTo($("ranks"));
+  const sheet = $("how-sheet") as HTMLDialogElement;
+  $("how").addEventListener("click", () => sheet.showModal());
+  sheet.addEventListener("click", (e) => e.target === sheet && sheet.close()); // click outside to close
 
   // ── the lens ──
   const lens = $("lens");
@@ -106,7 +117,7 @@ async function boot(): Promise<void> {
   const showScore = () => {
     $("score-value").textContent = played ? signedDollars(total) : "$0";
     $("score-value").dataset.sign = total > 0 ? "up" : total < 0 ? "down" : "";
-    $("score-detail").textContent = `over ${played} hand${played === 1 ? "" : "s"}`;
+    $("score-detail").textContent = played ? `${played} hand${played === 1 ? "" : "s"}` : "";
   };
   showScore();
 
@@ -127,7 +138,7 @@ async function boot(): Promise<void> {
       if (g !== generation) return;
       if (e.type === "board") street = STREET_OF_BOARD[e.cards.length] ?? street;
       if (e.type === "thinking") {
-        bar.wait("The fly is thinking…");
+        bar.wait();
         await table.handle(e);
         pending = { street };
         for (let k = 0; k < perDecision && g === generation; k++, next++) {
@@ -152,14 +163,13 @@ async function boot(): Promise<void> {
         continue;
       }
       if (e.type === "result") {
-        bar.wait("");
+        bar.wait();
         await table.handle(e);
         if (g !== generation) return;
         total += Math.round(e.human_bb * 100);
         played++;
         showScore();
-        const won = Math.round(e.human_bb * 100);
-        bar.recap(thoughts, won > 0 ? `You won ${dollars(won)}.` : won < 0 ? `The fly won ${dollars(-won)}.` : "Split pot.");
+        bar.recap(thoughts);
         continue;
       }
       await table.handle(e);
@@ -170,7 +180,8 @@ async function boot(): Promise<void> {
     const g = generation;
     thoughts = [];
     street = 0;
-    bar.wait("Dealing…");
+    bar.wait();
+    bar.hand(null, null);
     const seed = crypto.getRandomValues(new Uint32Array(1))[0];
     const reply = await call({ type: "newHand", seed, humanSeat: handNo++ % 2 });
     await play(reply, g);
@@ -190,7 +201,7 @@ async function boot(): Promise<void> {
   slider.value = slider.max;
   const showPick = () => {
     const s = snapshots[Number(slider.value)];
-    $("practice-hands").textContent = s.hands.toLocaleString();
+    $("practice-hands").textContent = `${short(s.hands)} hands`;
     chart.mark(s.hands);
   };
   const load = async (onDownload?: (loaded: number, total: number) => void) => {
@@ -207,7 +218,8 @@ async function boot(): Promise<void> {
     generation++;
     table.reset();
     brain.rest();
-    bar.wait("Switching flies…");
+    bar.wait();
+    bar.hand(null, null);
     await load();
     void deal();
   });
@@ -215,10 +227,10 @@ async function boot(): Promise<void> {
 
   // ── first load: the connectome (~16 MB) ──
   const mb = (b: number) => (b / 1e6).toFixed(1);
-  bar.wait("Loading…");
+  bar.wait();
   await load((loaded, size) => {
     const t = size || packed.file_bytes;
-    $("loading-text").textContent = `Downloading the fly's brain… ${mb(loaded)} of ${mb(t)} MB`;
+    $("loading-text").textContent = `Loading the fly's brain… ${mb(loaded)} / ${mb(t)} MB`;
     ($("loading-fill") as HTMLElement).style.transform = `scaleX(${Math.min(1, loaded / t)})`;
   });
   $("loading").hidden = true;

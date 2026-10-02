@@ -2,6 +2,7 @@
 // Driven entirely by the server's hand events; it never decides anything itself.
 
 import * as THREE from "three";
+import { describe, type MadeHand } from "./hands";
 import { OPPONENT_COLOR, OPPONENT_LABEL, ACTION_LABEL, type Message } from "./protocol";
 
 export const CARD_W = 0.62, CARD_H = 0.87;
@@ -9,6 +10,7 @@ const FELT = "#1f5a40", RAIL = "#3b2a22"; // tournament green felt, leather rail
 const PAPER = "#ede6d6", INK = "#0b0a10", RED = "#b3261e";
 const CHIP_COLORS = ["#8c1d5b", "#e0533a", "#f7b538", "#fff6d8"]; // Fire, low to high value
 const SUIT: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
+export const WIN = "#5cc777", LOSE = "#e0533a", HINT = "#f7b538"; // showdown green / red, your-hand gold
 
 type Seat = "fly" | "opponent";
 const SEAT_Z: Record<Seat, number> = { fly: 1.15, opponent: -1.25 };
@@ -86,6 +88,29 @@ export class Card {
     this.group.add(this.front, back);
     this.group.rotation.x = Math.PI / 2; // lying flat, face down
   }
+  private outline: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
+  private lifted = false;
+  /** A coloured border (and a small lift) marks the cards that make a hand; null removes it. */
+  highlight(color: string | null): void {
+    if (this.outline) this.group.remove(this.outline);
+    this.outline = null;
+    if (color) {
+      this.outline = new THREE.Mesh(
+        new THREE.PlaneGeometry(CARD_W + 0.12, CARD_H + 0.12),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 }),
+      );
+      this.outline.position.z = -0.004; // just behind the face
+      this.group.add(this.outline);
+      const o = this.outline;
+      void tween(350, (k) => (o.material.opacity = 0.95 * k));
+    }
+    const lift = color !== null;
+    if (lift !== this.lifted) {
+      const y0 = this.group.position.y, dy = lift ? 0.06 : -0.06;
+      this.lifted = lift;
+      void tween(300, (k) => (this.group.position.y = y0 + dy * k));
+    }
+  }
   reveal(code: string): void {
     this.front.material.map = cardTexture(code);
     this.front.material.needsUpdate = true;
@@ -127,6 +152,51 @@ export function chipStack(amount: number): THREE.Group {
   return g;
 }
 
+
+// ── the result: rings at each seat, cards that made the winning hand ────────────
+/** Green ring under the winner's seat, red under the loser's, gently pulsing. */
+export class SeatRings {
+  readonly group = new THREE.Group();
+  private rings = new Map<number, THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>>();
+  constructor(seatZ: number[]) {
+    for (const z of seatZ) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.98, 1.16, 64),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(0, 0.007, z + (z > 0 ? 0.05 : -0.05));
+      ring.scale.set(1.3, 0.55, 1);
+      ring.userData.level = 0;
+      this.rings.set(z, ring);
+      this.group.add(ring);
+    }
+  }
+  async show(z: number, color: string): Promise<void> {
+    const r = this.rings.get(z)!;
+    r.material.color.set(color);
+    await tween(450, (k) => (r.userData.level = k));
+  }
+  clear(): void {
+    for (const r of this.rings.values()) r.userData.level = 0;
+  }
+  tick(now: number): void {
+    for (const r of this.rings.values()) r.material.opacity = r.userData.level * (0.7 + 0.3 * Math.sin(now / 260));
+  }
+}
+
+/** Light up a showdown: the winner's hand cards green, the loser's (where not shared) red. */
+export function markShowdown(cards: Map<string, Card>, winner: MadeHand | null, loser: MadeHand | null): void {
+  for (const c of cards.values()) c.highlight(null);
+  const win = new Set(winner?.core ?? []);
+  for (const code of loser?.core ?? []) if (!win.has(code)) cards.get(code)?.highlight(LOSE);
+  for (const code of win) cards.get(code)?.highlight(WIN);
+}
+
+/** The words under a seat's name at the end: "Two pair", plus "Kings and 8s". */
+export function handWords(h: MadeHand): string {
+  return `${h.name} · ${h.detail}`;
+}
 
 // ── the opponent's avatar ─────────────────────────────────────────────────────
 // One robot behind the far seat, repainted in each bot's colour. More bots, more colours.
@@ -244,6 +314,10 @@ export class Table3D {
   private cards: Card[] = [];
   private oppCards: Card[] = [];
   private board: Card[] = [];
+  private faces = new Map<string, Card>(); // every face-up card on the table, by code
+  private flyCodes: string[] = [];
+  private boardCodes: string[] = [];
+  private rings = new SeatRings([SEAT_Z.fly, SEAT_Z.opponent]);
   private bets: Record<Seat, { amount: number; stack: THREE.Group | null }> = {
     fly: { amount: 0, stack: null },
     opponent: { amount: 0, stack: null },
@@ -290,7 +364,7 @@ export class Table3D {
     this.glow.scale.set(1.3, 0.55, 1);
     this.scene.add(this.glow);
 
-    this.scene.add(this.robot.group);
+    this.scene.add(this.robot.group, this.rings.group);
     this.lensMaterial.uniforms.scene.value = this.target.texture;
     this.post.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.lensMaterial));
 
@@ -332,6 +406,7 @@ export class Table3D {
     switch (m.type) {
       case "hand": {
         this.clear();
+        this.flyCodes = m.fly_cards;
         this.robot.wear(OPPONENT_COLOR[m.opponent]);
         this.setTag("opponent", OPPONENT_LABEL[m.opponent], "");
         this.setTag("fly", "The fly", m.fly_button ? "Dealer" : "Big blind");
@@ -348,6 +423,7 @@ export class Table3D {
         break;
       }
       case "board": {
+        this.boardCodes = m.cards;
         await this.sweepBets();
         for (let i = this.board.length; i < m.cards.length; i++) {
           const c = this.deal(m.cards[i]);
@@ -371,7 +447,10 @@ export class Table3D {
         break;
       case "result": {
         if (m.showdown) {
-          this.oppCards.forEach((c, i) => c.reveal(m.opponent_cards[i]));
+          this.oppCards.forEach((c, i) => {
+            c.reveal(m.opponent_cards[i]);
+            this.faces.set(m.opponent_cards[i], c);
+          });
           await Promise.all(this.oppCards.map((c) => c.flip()));
         }
         await this.sweepBets();
@@ -380,6 +459,22 @@ export class Table3D {
         const amount = `${bb >= 10 ? Math.round(bb) : Math.round(bb * 10) / 10} big blind${bb === 1 ? "" : "s"}`;
         this.labels.pot.textContent =
           winner === "fly" ? `The fly wins ${amount}` : winner ? `The fly loses ${amount}` : "Split pot";
+        const loser: Seat | null = winner === "fly" ? "opponent" : winner ? "fly" : null;
+        if (m.showdown) {
+          const board = this.boardCodes;
+          const hands: Record<Seat, MadeHand> = {
+            fly: describe([...this.flyCodes, ...board]),
+            opponent: describe([...m.opponent_cards, ...board]),
+          };
+          for (const seat of ["fly", "opponent"] as Seat[]) this.setTag(seat, null, handWords(hands[seat]));
+          markShowdown(this.faces, winner ? hands[winner] : hands.fly, loser ? hands[loser] : hands.opponent);
+        }
+        if (winner && loser) {
+          this.labels[winner].classList.add("is-winner");
+          this.labels[loser].classList.add("is-loser");
+          void this.rings.show(SEAT_Z[winner], WIN);
+          void this.rings.show(SEAT_Z[loser], LOSE);
+        }
         if (winner && this.pot.stack) {
           const s = this.pot.stack;
           const from = s.position.clone(), to = new THREE.Vector3(1.2, 0, SEAT_Z[winner] * 0.85);
@@ -392,6 +487,7 @@ export class Table3D {
 
   private deal(code: string | null): Card {
     const c = new Card(code);
+    if (code) this.faces.set(code, c);
     c.group.position.copy(DECK);
     this.scene.add(c.group);
     this.cards.push(c);
@@ -447,6 +543,10 @@ export class Table3D {
     this.cards = [];
     this.oppCards = [];
     this.board = [];
+    this.faces.clear();
+    this.boardCodes = [];
+    this.rings.clear();
+    for (const el of [this.labels.fly, this.labels.opponent]) el.classList.remove("is-winner", "is-loser");
     this.bets = { fly: { amount: 0, stack: null }, opponent: { amount: 0, stack: null } };
     this.pot = { amount: 0, stack: null };
     this.labels.pot.textContent = "";
@@ -481,8 +581,9 @@ export class Table3D {
   private tick(now: number): void {
     runTweens(now);
     this.robot.idle(now);
+    this.rings.tick(now);
     this.place(this.labels.opponent, new THREE.Vector3(1.45, 1.1, ROBOT_Z));
-    this.place(this.labels.fly, new THREE.Vector3(-1.75, 0.1, SEAT_Z.fly));
+    this.place(this.labels.fly, new THREE.Vector3(-2.1, 0.1, SEAT_Z.fly));
     this.place(this.labels.pot, new THREE.Vector3(0, 0.1, 0.7));
     if (this.lens) {
       this.renderer.setRenderTarget(this.target);

@@ -5,8 +5,10 @@
 import * as THREE from "three";
 import type { GameEvent } from "../engine/game";
 import { ACTION_LABEL } from "../protocol";
+import { describe, type MadeHand } from "../hands";
 import {
-  buildTable, Card, chipStack, DECK, FAR_Z, lensFragment, lensVertex, NEAR_Z, ROBOT_Z, runTweens, tween,
+  buildTable, Card, chipStack, DECK, FAR_Z, handWords, HINT, lensFragment, lensVertex, LOSE, markShowdown, NEAR_Z,
+  ROBOT_Z, runTweens, SeatRings, tween, WIN,
 } from "../table3d";
 import { FlyAvatar } from "./avatar";
 import { dollars } from "./money";
@@ -16,6 +18,12 @@ const SEAT_Z: Record<Seat, number> = { you: NEAR_Z, fly: FAR_Z };
 
 export class PlayTable {
   readonly fly = new FlyAvatar();
+  /** Called whenever your best hand changes (after the deal and each board card). */
+  onHand: (h: MadeHand, hole: string[], board: string[]) => void = () => {};
+  private rings = new SeatRings([NEAR_Z, FAR_Z]);
+  private faces = new Map<string, Card>();
+  private yourCodes: string[] = [];
+  private boardCodes: string[] = [];
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(42, 1, 0.1, 50);
@@ -63,7 +71,7 @@ export class PlayTable {
     this.glow.rotation.x = -Math.PI / 2;
     this.glow.position.set(0, 0.005, FAR_Z - 0.05);
     this.glow.scale.set(1.3, 0.55, 1);
-    this.scene.add(this.glow, this.fly.group);
+    this.scene.add(this.glow, this.fly.group, this.rings.group);
     this.lensMaterial.uniforms.scene.value = this.target.texture;
     this.post.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.lensMaterial));
 
@@ -111,6 +119,7 @@ export class PlayTable {
         this.setTag("you", "You", e.human_button ? "Dealer" : "Big blind");
         // Heads-up, the dealer posts the small blind.
         const yours = e.human_button ? 50 : 100;
+        this.yourCodes = e.human_cards;
         this.lastTotal = 150;
         await Promise.all([this.bet("you", yours), this.bet("fly", 150 - yours)]);
         this.labels.pot.textContent = `Pot ${dollars(150)}`;
@@ -121,15 +130,18 @@ export class PlayTable {
           this.flyCards.push(theirs);
           await theirs.moveTo(new THREE.Vector3(-0.36 + i * 0.72, 0.01 + i * 0.002, SEAT_Z.fly), false);
         }
+        this.hint();
         break;
       }
       case "board": {
+        this.boardCodes = e.cards;
         await this.sweepBets();
         for (let i = this.board.length; i < e.cards.length; i++) {
           const c = this.deal(e.cards[i]);
           this.board.push(c);
           await c.moveTo(new THREE.Vector3(-1.44 + i * 0.72, 0.01, -0.1), true, 360);
         }
+        this.hint();
         break;
       }
       case "thinking":
@@ -149,12 +161,33 @@ export class PlayTable {
         break;
       case "result": {
         // The fly's cards are always shown once the hand is over: that's the deal with visitors.
-        this.flyCards.forEach((c, i) => c.reveal(e.fly_cards[i]));
+        this.flyCards.forEach((c, i) => {
+          c.reveal(e.fly_cards[i]);
+          this.faces.set(e.fly_cards[i], c);
+        });
         await Promise.all(this.flyCards.map((c) => c.flip()));
         await this.sweepBets();
         const winner: Seat | null = e.human_bb > 0 ? "you" : e.human_bb < 0 ? "fly" : null;
+        const loser: Seat | null = winner === "you" ? "fly" : winner ? "you" : null;
         const amount = dollars(Math.abs(e.human_bb) * 100);
         this.labels.pot.textContent = winner === "you" ? `You win ${amount}` : winner ? `The fly wins ${amount}` : "Split pot";
+        const hands: Record<Seat, MadeHand> = {
+          you: describe([...this.yourCodes, ...e.board]),
+          fly: describe([...e.fly_cards, ...e.board]),
+        };
+        if (e.showdown) {
+          this.setTag("you", null, handWords(hands.you));
+          this.setTag("fly", null, handWords(hands.fly));
+          markShowdown(this.faces, winner ? hands[winner] : hands.you, loser ? hands[loser] : hands.fly);
+        } else {
+          for (const c of this.faces.values()) c.highlight(null);
+        }
+        if (winner && loser) {
+          this.labels[winner].classList.add("is-winner");
+          this.labels[loser].classList.add("is-loser");
+          void this.rings.show(SEAT_Z[winner], WIN);
+          void this.rings.show(SEAT_Z[loser], LOSE);
+        }
         if (winner && this.pot.stack) {
           const s = this.pot.stack;
           const from = s.position.clone(), to = new THREE.Vector3(1.2, 0, SEAT_Z[winner] * 0.85);
@@ -165,8 +198,17 @@ export class PlayTable {
     }
   }
 
+  /** Gold borders under the cards that make your hand (from a pair up), and tell the page. */
+  private hint(): void {
+    const h = describe([...this.yourCodes, ...this.boardCodes]);
+    const core = new Set(h.rank >= 1 ? h.core : []);
+    for (const [code, card] of this.faces) card.highlight(core.has(code) ? HINT : null);
+    this.onHand(h, this.yourCodes, this.boardCodes);
+  }
+
   private deal(code: string | null): Card {
     const c = new Card(code);
+    if (code) this.faces.set(code, c);
     c.group.position.copy(DECK);
     this.scene.add(c.group);
     this.cards.push(c);
@@ -222,6 +264,10 @@ export class PlayTable {
     this.cards = [];
     this.flyCards = [];
     this.board = [];
+    this.faces.clear();
+    this.boardCodes = [];
+    this.rings.clear();
+    for (const el of [this.labels.you, this.labels.fly]) el.classList.remove("is-winner", "is-loser");
     this.bets = { you: { amount: 0, stack: null }, fly: { amount: 0, stack: null } };
     this.pot = { amount: 0, stack: null };
     this.labels.pot.textContent = "";
@@ -259,8 +305,9 @@ export class PlayTable {
   private tick(now: number): void {
     runTweens(now);
     this.fly.idle(now);
+    this.rings.tick(now);
     this.place(this.labels.fly, new THREE.Vector3(1.8, 1.1, ROBOT_Z));
-    this.place(this.labels.you, new THREE.Vector3(-1.75, 0.1, SEAT_Z.you));
+    this.place(this.labels.you, new THREE.Vector3(-2.1, 0.1, SEAT_Z.you));
     this.place(this.labels.pot, new THREE.Vector3(0, 0.1, 0.7));
     if (this.lens) {
       this.renderer.setRenderTarget(this.target);
