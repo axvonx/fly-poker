@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+    <link rel="apple-touch-icon" href="icon-180.png" />
     <title>Play the Fly</title>
     <meta name="description" content="Play heads-up poker against a fruit fly's connectome: 166,700 real neurons, frozen wiring, a trained readout." />
   </head>
@@ -38,11 +41,7 @@
         <div class="bar__main">
           <div id="bar-actions" class="actions" role="group" aria-label="Your move">
             <div class="actions__row" id="actions"></div>
-          </div>
-          <div id="bar-recap" class="recap" hidden>
-            <p class="hud__label">The fly's thinking</p>
-            <ol class="recap__list" id="recap-list"></ol>
-            <button class="next" id="next" type="button">Next hand</button>
+            <button class="next" id="next" type="button" hidden>Next hand →</button>
           </div>
           <div class="hand-row">
             <div class="hand" aria-live="polite">
@@ -71,7 +70,7 @@
           <div class="lut"><span class="lut__ramp"></span><span class="lut__text">resting</span><span class="lut__text">firing</span></div>
         </div>
         <nav class="links" aria-label="Credits">
-          <a href="https://www.janelia.org/project-team/flyem" title="Connectome: MaleCNS v1.0 by FlyEM (HHMI Janelia), University of Cambridge and Google. CC-BY 4.0">MaleCNS v1.0</a>
+          <a href="https://www.janelia.org/project-team/flyem" title="Connectome: MaleCNS v1.0 by FlyEM (HHMI Janelia), University of Cambridge and Google. CC-BY 4.0">MaleCNS v1.0 · CC-BY</a>
           <a href="https://github.com/axvonx/fly-poker" title="Code on GitHub" aria-label="Code on GitHub">
             <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           </a>
@@ -81,20 +80,15 @@
 
     <dialog class="sheet" id="how-sheet" aria-labelledby="how-title">
       <form method="dialog" class="sheet__close"><button aria-label="Close">✕</button></form>
-      <h2 id="how-title">How to play</h2>
-      <ol class="steps">
-        <li><b>2 cards each</b>, face down. Then <b>5 shared cards</b>: 3, 1, 1.</li>
-        <li>Each round: <b>check, call, raise</b> — or <b>fold</b> and give up the pot.</li>
-        <li><b>Best 5 cards</b> from your 2 + the shared 5 wins.</li>
-      </ol>
-      <h3>Hands, strongest first <span class="unit">how often by the river</span></h3>
-      <ol class="ranks" id="ranks"></ol>
-      <p class="sheet__foot">
-        The fly is 166,700 real neurons from the
-        <a href="https://www.janelia.org/project-team/flyem">MaleCNS v1.0</a> connectome (FlyEM / HHMI Janelia,
-        Cambridge, Google; CC-BY 4.0). Its wiring is frozen; only how we read its decisions was trained.
-        <a href="https://github.com/axvonx/fly-poker">Code</a>.
+      <h2 id="how-title">Which hand wins?</h2>
+      <p class="sheet__lead">
+        Make your best 5 cards from your 2 and the 5 shared ones. Higher on this list wins.
+        Same hand? Higher cards win.
       </p>
+      <ol class="ranks" id="ranks"></ol>
+      <a class="sheet__tutorial" href="https://www.wikihow.com/Play-Texas-Hold-%27Em" target="_blank" rel="noopener">
+        New to poker? Learn to play on wikiHow ↗
+      </a>
     </dialog>
     <script type="module" src="/src/play/main.ts"></script>
   </body>

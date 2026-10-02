@@ -18,11 +18,12 @@ import { DECK } from "../engine/poker";
 import { winChance } from "../hands";
 import type { GameEvent } from "../engine/game";
 import type { Reply, Request } from "../engine/worker";
-import { Bar, type FlyThought } from "./bar";
+import { Bar } from "./bar";
 import { Chart, type TrainingSeries } from "./chart";
 import { buildHowTo } from "./howto";
 import { signedDollars } from "./money";
 import { PlayTable } from "./table";
+import { renderThoughts, type FlyThought } from "./thoughts";
 
 const $ = (id: string) => document.getElementById(id)!;
 const url = (path: string) => new URL(path, document.baseURI).href; // the worker resolves URLs against its own script
@@ -169,7 +170,9 @@ async function boot(): Promise<void> {
         total += Math.round(e.human_bb * 100);
         played++;
         showScore();
-        bar.recap(thoughts);
+        renderThoughts(table.bubble, thoughts);
+        table.bubble.hidden = false;
+        bar.done();
         continue;
       }
       await table.handle(e);

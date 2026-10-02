@@ -66,7 +66,7 @@
 .loading.is-error #loading-text { color: var(--fire-2); }
 .loading.is-error .loading__track { display: none; }
 
-/* ── The bar: your choices (or the fly's recap), your hand, how to play ── */
+/* ── The bar: your choices (or Next hand), your hand, how to play ── */
 
 .bar {
   grid-area: bar;
@@ -103,7 +103,7 @@
 .act--fold:not(:disabled) { color: var(--fire-2); }
 
 /* Your hand, in big words. */
-.hand-row { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--gap); }
+.hand-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--gap); }
 .hand { display: grid; gap: calc(var(--u) * 0.3); min-width: 0; }
 .hand__name {
   font: 700 calc(var(--u) * 4.2) / 1 var(--display);
@@ -137,27 +137,61 @@
 }
 .how { background: transparent; color: var(--paper); border: 1px solid var(--coverslip-edge); }
 .how:hover { border-color: var(--fire-3); }
-.next { background: var(--fire-3); color: var(--slide); border: 0; justify-self: start; }
+.next { width: 100%; min-height: calc(var(--u) * 4.9); background: var(--fire-3); color: var(--slide); border: 0; font-size: calc(var(--u) * 1.7); animation: rise 260ms ease-out both; }
 
-/* The fly's thinking, one row per decision. */
-.recap { display: grid; gap: var(--u); }
-.recap .hud__label { margin: 0; }
-.recap__list { display: grid; gap: calc(var(--u) * 0.6); }
+/* After the hand: the fly's thinking, in a bubble beside its head. */
+.bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: min(19rem, calc(100% - 16px));
+  display: grid;
+  gap: calc(var(--u) * 0.6);
+  padding: var(--u) calc(var(--u) * 1.2);
+  background: rgb(26 24 34 / 0.94);
+  border: 1px solid var(--coverslip-edge);
+  border-radius: calc(var(--u) * 1.2);
+  pointer-events: auto;
+  animation: bubble 320ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.bubble::after { /* the tail, pointing at the fly */
+  content: "";
+  position: absolute;
+  right: calc(var(--u) * -0.75);
+  top: 50%;
+  width: calc(var(--u) * 1.4);
+  height: calc(var(--u) * 1.4);
+  background: inherit;
+  border: inherit;
+  border-width: 1px 1px 0 0;
+  transform: translateY(-50%) rotate(45deg);
+}
+@keyframes bubble { from { opacity: 0; scale: 0.85; } }
+
+/* A narrow table has no room beside the fly for the full bubble: short labels, no bars. */
+.game { container-type: inline-size; }
+@container (max-width: 560px) {
+  .bubble { width: auto; max-width: 44%; padding: calc(var(--u) * 0.6) var(--u); gap: calc(var(--u) * 0.4); }
+  .bubble__title { font-size: calc(var(--u) * 1.15); }
+  .thought { grid-template-columns: auto auto; gap: calc(var(--u) * 0.5); }
+  .thought__street { font-size: calc(var(--u) * 1); }
+  .bubble .thought__bar, .bubble .pill__long { display: none; }
+  .bubble .pill__short { display: inline; }
+  .pill { font-size: calc(var(--u) * 1.05); }
+}
+.bubble__title { font: 500 calc(var(--u) * 1.3) var(--display); color: var(--fire-3); }
 .thought {
   display: grid;
   grid-template-columns: calc(var(--u) * 6) auto minmax(0, 1fr);
   align-items: center;
-  gap: var(--u);
+  gap: calc(var(--u) * 0.7);
   animation: rise 300ms ease-out both;
 }
-.thought:nth-child(2) { animation-delay: 80ms; }
-.thought:nth-child(3) { animation-delay: 160ms; }
-.thought:nth-child(4) { animation-delay: 240ms; }
 @keyframes rise { from { transform: translateY(6px); opacity: 0; } }
-.thought--none { display: block; color: var(--graphite); }
-.thought__street { font: 400 calc(var(--u) * 1.2) var(--mono); color: var(--graphite); }
-.pill { font: 600 calc(var(--u) * 1.25) var(--body); padding: 2px calc(var(--u) * 0.7); color: var(--slide); white-space: nowrap; }
-.thought__bar { display: flex; height: calc(var(--u) * 0.8); gap: 2px; }
+.thought__street { font: 400 calc(var(--u) * 1.1) var(--mono); color: var(--graphite); white-space: nowrap; }
+.pill__short { display: none; }
+.pill { font: 600 calc(var(--u) * 1.15) var(--body); padding: 1px calc(var(--u) * 0.6); color: var(--slide); white-space: nowrap; }
+.thought__bar { display: flex; height: calc(var(--u) * 0.7); gap: 2px; min-width: calc(var(--u) * 3); }
 .seg { min-width: 3px; opacity: 0.5; }
 .seg.is-chosen { opacity: 1; }
 .seg--fold, .pill--fold { background: var(--fire-1); }
@@ -201,16 +235,18 @@
 .sheet h3 { margin: var(--gap) 0 var(--u); font: 500 calc(var(--u) * 1.6) var(--display); color: var(--graphite); }
 .sheet__close { position: absolute; top: var(--u); right: var(--u); }
 .sheet__close button { background: none; border: 0; color: var(--graphite); font-size: calc(var(--u) * 2); cursor: pointer; min-width: 44px; min-height: 44px; }
-.steps { display: grid; gap: calc(var(--u) * 0.6); padding-left: 1.4em; list-style: decimal; }
-.steps b { color: var(--fire-3); font-weight: 600; }
-.ranks { display: grid; gap: calc(var(--u) * 0.7); }
+.sheet__lead { color: var(--graphite); margin-bottom: var(--gap); }
+.ranks { display: grid; gap: calc(var(--u) * 0.4); }
 .rank {
   display: grid;
-  grid-template-columns: calc(var(--u) * 10.5) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto calc(var(--u) * 7.5);
   align-items: center;
-  gap: var(--u);
+  gap: calc(var(--u) * 1.2);
+  padding: calc(var(--u) * 0.5) 0;
+  border-bottom: 1px solid var(--coverslip-edge);
 }
 .rank__name { font-weight: 600; }
+.rank__plain { font-size: calc(var(--u) * 1.25); color: var(--graphite); }
 .rank__cards { display: flex; gap: 3px; }
 .mini {
   display: inline-grid;
@@ -220,17 +256,23 @@
   background: var(--paper);
   border-radius: 3px;
   font: 700 calc(var(--u) * 1.15) var(--display);
-  opacity: 0.45;
+  opacity: 0.4;
 }
 .mini.is-lit { opacity: 1; box-shadow: 0 0 0 2px var(--fire-3); }
 .mini--red { color: #b3261e; }
 .mini--black { color: var(--slide); }
-.rank__odds { display: flex; align-items: center; gap: var(--u); min-width: 0; }
-.rank__bar { flex: 1; height: 5px; background: var(--slide); overflow: hidden; }
-.rank__bar span { display: block; height: 100%; background: var(--fire-3); transform-origin: left; }
-.rank__pct { font: 400 calc(var(--u) * 1.15) var(--mono); color: var(--graphite); min-width: 6ch; text-align: right; }
-.sheet__foot { margin-top: var(--gap); font-size: calc(var(--u) * 1.2); color: var(--graphite); }
-.sheet a { color: var(--paper); }
+.rank__odds { font: 400 calc(var(--u) * 1.2) var(--mono); color: var(--graphite); text-align: right; white-space: nowrap; }
+.sheet__tutorial {
+  display: block;
+  margin-top: var(--gap);
+  padding: var(--u) calc(var(--u) * 1.4);
+  border: 1px solid var(--fire-3);
+  color: var(--fire-3) !important;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+.sheet__tutorial:hover { background: rgb(247 181 56 / 0.1); }
 
 /* ── Phones and narrow windows: everything in one column ── */
 
@@ -255,9 +297,10 @@
   .score .counter { font-size: calc(var(--u) * 2.6); }
   .actions__row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .rank { grid-template-columns: minmax(0, 1fr) auto; }
-  .rank__odds { grid-column: 1 / -1; }
+  .rank__cards { grid-row: 2; }
+  .rank__odds { grid-row: 1; grid-column: 2; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hand__name.is-new, .thought, .sheet[open] { animation: none; }
+  .hand__name.is-new, .thought, .sheet[open], .bubble, .next { animation: none; }
 }

@@ -27,7 +27,10 @@ export function tween(dur: number, step: (k: number) => void): Promise<void> {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) dur = 1;
   return new Promise((done) => tweens.add({ t0: performance.now(), dur, step, done }));
 }
+export /** Seconds, shared by every spinning outline; advanced by runTweens each frame. */
+const spin = { value: 0 };
 export function runTweens(now: number): void {
+  spin.value = now / 1000;
   for (const t of tweens) {
     const k = Math.min(1, (now - t.t0) / t.dur);
     t.step(ease(k));
@@ -77,6 +80,31 @@ function cardTexture(code: string | null): THREE.Texture {
   return tex;
 }
 
+/** Half one colour, half the other, split by a line through the centre that turns slowly. */
+function splitMaterial(a: string, b: string): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: { a: { value: new THREE.Color(a) }, b: { value: new THREE.Color(b) }, opacity: { value: 0 }, time: spin },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 a;
+      uniform vec3 b;
+      uniform float opacity;
+      uniform float time;
+      varying vec2 vUv;
+      void main() {
+        vec2 p = (vUv - 0.5) * vec2(0.71, 1.0); // card aspect, so the split stays even
+        float t = fract(atan(p.y, p.x) / 6.2831853 + time * 0.3);
+        float k = smoothstep(0.0, 0.03, t) * (1.0 - smoothstep(0.5, 0.53, t));
+        gl_FragColor = vec4(mix(b, a, k), opacity);
+      }
+    `,
+  });
+}
+
 export class Card {
   readonly group = new THREE.Group();
   private front: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
@@ -88,21 +116,21 @@ export class Card {
     this.group.add(this.front, back);
     this.group.rotation.x = Math.PI / 2; // lying flat, face down
   }
-  private outline: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
+  private outline: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial | THREE.ShaderMaterial> | null = null;
   private lifted = false;
-  /** A coloured border (and a small lift) marks the cards that make a hand; null removes it. */
-  highlight(color: string | null): void {
+  /** A coloured border (and a small lift) marks the cards that make a hand; null removes it.
+   * Two colours: a card in both players' hands, its border half each, circling the edge. */
+  highlight(color: string | null, second?: string): void {
     if (this.outline) this.group.remove(this.outline);
     this.outline = null;
     if (color) {
-      this.outline = new THREE.Mesh(
-        new THREE.PlaneGeometry(CARD_W + 0.12, CARD_H + 0.12),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 }),
-      );
+      const material = second ? splitMaterial(color, second) : new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
+      this.outline = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W + 0.12, CARD_H + 0.12), material);
       this.outline.position.z = -0.004; // just behind the face
       this.group.add(this.outline);
-      const o = this.outline;
-      void tween(350, (k) => (o.material.opacity = 0.95 * k));
+      const fade = (k: number) =>
+        material instanceof THREE.ShaderMaterial ? (material.uniforms.opacity.value = 0.95 * k) : (material.opacity = 0.95 * k);
+      void tween(350, fade);
     }
     const lift = color !== null;
     if (lift !== this.lifted) {
@@ -185,17 +213,17 @@ export class SeatRings {
   }
 }
 
-/** Light up a showdown: the winner's hand cards green, the loser's (where not shared) red. */
+/** Light up a showdown: the winner's hand cards green, the loser's red, shared ones both. */
 export function markShowdown(cards: Map<string, Card>, winner: MadeHand | null, loser: MadeHand | null): void {
   for (const c of cards.values()) c.highlight(null);
-  const win = new Set(winner?.core ?? []);
-  for (const code of loser?.core ?? []) if (!win.has(code)) cards.get(code)?.highlight(LOSE);
-  for (const code of win) cards.get(code)?.highlight(WIN);
+  const win = new Set(winner?.core ?? []), lose = new Set(loser?.core ?? []);
+  for (const code of lose) if (!win.has(code)) cards.get(code)?.highlight(LOSE);
+  for (const code of win) cards.get(code)?.highlight(WIN, lose.has(code) ? LOSE : undefined);
 }
 
-/** The words under a seat's name at the end: "Two pair", plus "Kings and 8s". */
+/** The words under a seat's name at the end: "Two pair" over "Kings and 8s" (two lines). */
 export function handWords(h: MadeHand): string {
-  return `${h.name} · ${h.detail}`;
+  return `${h.name}\n${h.detail}`;
 }
 
 // ── the opponent's avatar ─────────────────────────────────────────────────────

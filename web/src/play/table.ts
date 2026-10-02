@@ -40,6 +40,8 @@ export class PlayTable {
   private generation = 0; // bumped by reset(): queued events from an abandoned hand are dropped
   private glow: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   private labels: Record<Seat | "pot", HTMLElement>;
+  /** After the hand, what the fly was thinking, in a bubble beside its head. */
+  readonly bubble: HTMLElement;
   private lens = false;
   private target = new THREE.WebGLRenderTarget(1, 1);
   private post = new THREE.Scene();
@@ -82,6 +84,10 @@ export class PlayTable {
       return el;
     };
     this.labels = { fly: tag("tag--fly"), you: tag("tag--you"), pot: tag("tag--pot") };
+    this.bubble = document.createElement("div");
+    this.bubble.className = "bubble";
+    this.bubble.hidden = true;
+    overlay.append(this.bubble);
 
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
@@ -271,6 +277,7 @@ export class PlayTable {
     this.bets = { you: { amount: 0, stack: null }, fly: { amount: 0, stack: null } };
     this.pot = { amount: 0, stack: null };
     this.labels.pot.textContent = "";
+    this.bubble.hidden = true;
     this.thinking(0);
   }
 
@@ -302,6 +309,15 @@ export class PlayTable {
     el.style.transform = `translate(-50%, -50%) translate(${((v.x + 1) / 2) * this.canvas.clientWidth}px, ${((1 - v.y) / 2) * this.canvas.clientHeight}px)`;
   }
 
+  /** Right edge at the fly's left cheek, tail pointing at it; kept inside the canvas. */
+  private placeBubble(): void {
+    const v = new THREE.Vector3(-0.95, 1.05, ROBOT_Z).project(this.camera);
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    const bw = this.bubble.offsetWidth, bh = this.bubble.offsetHeight;
+    const x = Math.max(8, ((v.x + 1) / 2) * w - bw), y = Math.min(Math.max(8, ((1 - v.y) / 2) * h - bh / 2), h - bh - 8);
+    this.bubble.style.transform = `translate(${x}px, ${y}px)`;
+  }
+
   private tick(now: number): void {
     runTweens(now);
     this.fly.idle(now);
@@ -309,6 +325,7 @@ export class PlayTable {
     this.place(this.labels.fly, new THREE.Vector3(1.8, 1.1, ROBOT_Z));
     this.place(this.labels.you, new THREE.Vector3(-2.1, 0.1, SEAT_Z.you));
     this.place(this.labels.pot, new THREE.Vector3(0, 0.1, 0.7));
+    if (!this.bubble.hidden) this.placeBubble();
     if (this.lens) {
       this.renderer.setRenderTarget(this.target);
       this.renderer.render(this.scene, this.camera);
