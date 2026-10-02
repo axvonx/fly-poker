@@ -355,7 +355,10 @@ export const lensFragment = /* glsl */ `
 `;
 
 // ── the table itself: lights, felt, rail ──────────────────────────────────────
-export function buildTable(scene: THREE.Scene): void {
+/** Lights, felt and rail. The felt is a stadium w by d (long side along x); `turn` rotates it a
+ * quarter turn, so the long side runs toward the camera (the phone's portrait table). `see` < 1
+ * makes the felt translucent, for a brain drawn behind the table. */
+export function buildTable(scene: THREE.Scene, { w = 6.0, d = 3.6, turn = false, see = 1 } = {}): void {
   scene.add(new THREE.HemisphereLight("#d8cfe8", "#0b0a10", 1.1));
   const key = new THREE.SpotLight("#fff1dc", 60, 14, 0.75, 0.6);
   key.position.set(0, 6, 1.2);
@@ -368,18 +371,21 @@ export function buildTable(scene: THREE.Scene): void {
     s.absarc(w / 2 - r, 0, r, -Math.PI / 2, Math.PI / 2, false);
     return s;
   };
-  const railShape = shape(6.6, 4.2);
-  railShape.holes.push(shape(6.0, 3.6)); // a padded ring around the felt, not a lid over it
+  const railShape = shape(w + 0.6, d + 0.6);
+  railShape.holes.push(shape(w, d)); // a padded ring around the felt, not a lid over it
   const rail = new THREE.Mesh(
     new THREE.ExtrudeGeometry(railShape, { depth: 0.16, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, curveSegments: 48 }),
     new THREE.MeshStandardMaterial({ color: RAIL, roughness: 0.6 }),
   );
   rail.rotation.x = -Math.PI / 2;
   rail.position.y = -0.17;
-  const felt = new THREE.Mesh(new THREE.ShapeGeometry(shape(6.0, 3.6), 48), new THREE.MeshStandardMaterial({ color: FELT, roughness: 0.95 }));
+  const felt = new THREE.Mesh(new THREE.ShapeGeometry(shape(w, d), 48), new THREE.MeshStandardMaterial({ color: FELT, roughness: 0.95, transparent: see < 1, opacity: see }));
   felt.rotation.x = -Math.PI / 2;
   felt.position.y = 0.001;
-  scene.add(rail, felt);
+  const top = new THREE.Group();
+  top.add(rail, felt);
+  if (turn) top.rotation.y = Math.PI / 2;
+  scene.add(top);
 }
 
 // ── the table ─────────────────────────────────────────────────────────────────

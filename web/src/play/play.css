@@ -143,6 +143,12 @@
   transform: translateY(-50%) rotate(45deg);
 }
 @keyframes bubble { from { opacity: 0; scale: 0.85; } }
+.bubble--below::after { /* under the fly: the tail points up at it */
+  right: auto;
+  left: 50%;
+  top: calc(var(--u) * -0.75);
+  transform: translateX(-50%) rotate(-45deg);
+}
 
 /* A narrow table has no room beside the fly for the full bubble: short labels, no bars. */
 .game { container-type: inline-size; }
@@ -281,4 +287,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hand__name.is-new, .thought, .sheet[open], .bubble, .next { animation: none; }
+}
+
+/* Phones get the mobile view (play/mobile/), which replaces this markup at load: don't flash it. */
+@media (max-width: 700px) {
+  main.play { visibility: hidden; }
 }

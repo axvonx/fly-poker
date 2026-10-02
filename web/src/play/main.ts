@@ -16,6 +16,9 @@ import { bootData } from "./boot";
 import { PlayController } from "./controller";
 import { DesktopView } from "./desktop";
 
+// Phones (and narrow windows) get the portrait view, decided once at load.
+const MOBILE = matchMedia("(max-width: 700px)").matches;
+
 function fail(message: string): void {
   const el = document.getElementById("loading");
   if (!el) return;
@@ -32,7 +35,7 @@ async function boot(): Promise<void> {
   ]);
   const data = await bootData();
   await fonts;
-  const view = new DesktopView(data);
+  const view = MOBILE ? new (await import("./mobile/view")).MobileView(data) : new DesktopView(data);
   const ctl = new PlayController(view, data.snapshots);
   view.bind(ctl);
   await ctl.start();

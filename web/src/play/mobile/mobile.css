@@ -1,0 +1,164 @@
+/* The phone page: one screen, no scrolling. Tokens (colours, fonts) come from style.css. */
+
+body.is-mobile { overflow: hidden; overscroll-behavior: none; }
+
+.m {
+  --u: clamp(9px, 2.6vw, 12px);
+  --win: #5cc777;
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  background: var(--slide);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* ── Top bar ── */
+.m-top {
+  display: flex;
+  align-items: center;
+  gap: var(--u);
+  min-height: 48px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--coverslip-edge);
+}
+.m-score { display: flex; align-items: baseline; gap: calc(var(--u) * 0.6); margin-right: auto; }
+.m-score__value { font: 500 calc(var(--u) * 2.2) var(--mono); }
+.m-score__value[data-sign="up"] { color: var(--win); }
+.m-score__value[data-sign="down"] { color: var(--fire-2); }
+.m-score__detail { font: 400 calc(var(--u) * 1.15) var(--mono); color: var(--graphite); }
+.m-chip, .m-menu {
+  min-height: 40px;
+  padding: 0 12px;
+  background: var(--coverslip);
+  color: var(--paper);
+  border: 1px solid var(--coverslip-edge);
+  border-radius: 20px;
+  font: 600 calc(var(--u) * 1.25) var(--body);
+}
+.m-chip { color: var(--fire-3); }
+.m-menu { min-width: 44px; font-size: calc(var(--u) * 1.6); }
+
+/* ── Stage: the brain glows behind the table ── */
+.m-stage { position: relative; min-height: 0; overflow: hidden; container-type: inline-size; } /* compact bubble (play.css) */
+.m-brain, .m-table { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.m-brain { transition: opacity 250ms ease-out; }
+.m-tags { position: absolute; inset: 0; pointer-events: none; }
+.m .tag__name { font-size: calc(var(--u) * 1.6); }
+.m .tag__action { font-size: calc(var(--u) * 1.2); }
+.m .tag--pot { font-size: calc(var(--u) * 1.4); }
+.m .verdict { font-size: calc(var(--u) * 2.4); }
+.m .bubble { width: auto; max-width: 46%; }
+
+.m-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--u);
+  padding: 16px;
+  background: rgb(11 10 16 / 0.85);
+  font: 400 calc(var(--u) * 1.3) var(--mono);
+  text-align: center;
+}
+.m-loading[hidden] { display: none; }
+.m-loading__track { width: 70vw; height: 4px; background: var(--coverslip-edge); overflow: hidden; }
+.m-loading__fill { display: block; height: 100%; background: var(--fire); transform-origin: left; transform: scaleX(0); }
+.m-loading.is-error .m-loading__text { color: var(--fire-2); }
+.m-loading.is-error .m-loading__track { display: none; }
+
+/* ── Your hand, as a pill above the dock ── */
+.m-pill { padding: 6px 12px 0; min-height: 34px; }
+.m-pill.hand { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--u); row-gap: 2px; }
+.m-pill .hand__name { font-size: calc(var(--u) * 2.2); min-height: 0; }
+.m-pill .hand__detail { font-size: calc(var(--u) * 1.25); min-height: 0; }
+.m-pill .hand__meter { margin-left: auto; }
+.m-pill .hand__track { width: calc(var(--u) * 6); background: var(--coverslip-edge); }
+.m-pill .hand__chance { font-size: calc(var(--u) * 1.1); }
+
+/* ── Dock ── */
+.m-dockwrap { padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
+.dock { display: grid; gap: 8px; }
+.dock__row { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 8px; }
+.dock__btn, .pick__btn, .dock__next {
+  display: grid;
+  place-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 6px 4px;
+  background: var(--coverslip);
+  color: var(--paper);
+  border: 1px solid var(--coverslip-edge);
+  border-radius: 12px;
+  font: 700 calc(var(--u) * 1.6) var(--body);
+}
+.btn__detail { font: 400 calc(var(--u) * 1.15) var(--mono); color: var(--graphite); }
+.btn__detail:empty { display: none; }
+.dock__btn:disabled { opacity: 0.35; }
+.dock__btn--fold:not(:disabled) { color: var(--fire-2); }
+.dock__btn:not(:disabled):active, .pick__btn:active { transform: scale(0.97); }
+.dock__btn--raise[aria-expanded="true"] { border-color: var(--fire-3); color: var(--fire-3); }
+.pick { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; animation: rise 180ms ease-out; }
+.pick[hidden] { display: none; }
+.pick__btn { border-color: var(--fire-3); }
+.pick__btn[hidden] { display: none; }
+.dock__next { display: none; background: var(--fire-3); color: var(--slide); border: 0; }
+.dock.is-done .dock__row, .dock.is-done .pick { display: none; }
+.dock.is-done .dock__next { display: grid; animation: rise 220ms ease-out; }
+
+/* ── The sheet: everything that isn't the game ── */
+.m-sheet {
+  margin: auto 0 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 86dvh;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  background: var(--coverslip);
+  color: var(--paper);
+  border: 0;
+  border-top: 1px solid var(--coverslip-edge);
+  border-radius: 18px 18px 0 0;
+  overflow-y: auto;
+  font-size: calc(var(--u) * 1.4);
+}
+.m-sheet[open] { animation: sheet 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes sheet { from { transform: translateY(40%); opacity: 0; } }
+.m-sheet::backdrop { background: rgb(11 10 16 / 0.6); }
+.m-sheet section { display: grid; gap: var(--u); padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--coverslip-edge); }
+.m-sheet h2 { margin: 0; font: 700 calc(var(--u) * 2) var(--display); }
+.m-sheet__close { position: absolute; top: 8px; right: 8px; }
+.m-sheet__close button { min-width: 44px; min-height: 44px; background: none; border: 0; color: var(--graphite); font-size: 20px; }
+.m-practice { display: grid; gap: 6px; }
+.m-practice input { width: 100%; accent-color: var(--fire-3); }
+.m-practice__hands { font-family: var(--mono); color: var(--fire-3); }
+.m-lens { justify-self: start; min-height: 44px; padding: 0 16px; background: var(--slide); color: var(--paper); border: 1px solid var(--coverslip-edge); border-radius: 22px; font: 600 calc(var(--u) * 1.3) var(--body); }
+.m-lens[aria-pressed="true"] { border-color: var(--fire-3); color: var(--fire-3); }
+.m-sheet .rank { grid-template-columns: minmax(0, 1fr) auto; }
+.m-sheet .rank__cards { grid-row: 2; }
+.m-sheet .rank__odds { grid-row: 1; grid-column: 2; }
+.m-sheet #training-graph { width: 100%; height: auto; }
+.m-links { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; font: 400 calc(var(--u) * 1.15) var(--mono); color: var(--graphite); }
+.m-links a { color: var(--paper); display: flex; }
+
+/* ── Phones on their side: ask for portrait ── */
+.m-rotate { display: none; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .m-rotate {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    background: var(--slide);
+    font: 700 22px var(--display);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-sheet[open], .pick, .dock.is-done .dock__next { animation: none; }
+}

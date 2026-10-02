@@ -65,10 +65,11 @@ export class BrainView {
     xyz: Float32Array,
     readout: number[],
     onResize: () => void,
+    maxPixelRatio = 2, // phones pass less: the point cloud is the heaviest thing on screen
   ) {
     const n = xyz.length / 3;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, maxPixelRatio));
 
     // Data axes: x left-right, z head-to-tail, y depth. Screen: x right, z down.
     let [minX, maxX, minZ, maxZ, minY, maxY] = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];

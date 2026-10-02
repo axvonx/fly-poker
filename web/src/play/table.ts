@@ -14,13 +14,52 @@ import { FlyAvatar } from "./avatar";
 import { dollars } from "./money";
 
 type Seat = "you" | "fly";
-const SEAT_Z: Record<Seat, number> = { you: NEAR_Z, fly: FAR_Z };
+const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+
+/** Where everything sits. "wide" is the desktop table; "portrait" is a phone's: the table turned so
+ * its long side runs up the screen, the fly at the top end, you at the bottom, camera overhead. */
+interface Layout {
+  table: { w: number; d: number; turn: boolean; see?: number };
+  seat: Record<Seat, number>; // z of each seat's cards
+  avatarZ: number;
+  avatarScale: number;
+  boardZ: number;
+  potZ: number; // where bets are swept to
+  anchors: { fly: THREE.Vector3; you: THREE.Vector3; pot: THREE.Vector3; verdict: THREE.Vector3; bubble: THREE.Vector3 };
+  bubbleBeside: boolean; // bubble to the left of the fly (wide) or under it (portrait)
+  fit: THREE.Vector3[] | null; // points the camera keeps in frame (portrait), else the desktop framing
+}
+const WIDE: Layout = {
+  table: { w: 6.0, d: 3.6, turn: false },
+  seat: { you: NEAR_Z, fly: FAR_Z },
+  avatarZ: ROBOT_Z,
+  avatarScale: 1.1,
+  boardZ: -0.1,
+  potZ: 0.42,
+  anchors: { fly: V(1.8, 1.1, ROBOT_Z), you: V(-2.1, 0.1, NEAR_Z), pot: V(0, 0.1, 0.7), verdict: V(0, -0.2, 2.75), bubble: V(-0.95, 1.05, ROBOT_Z) },
+  bubbleBeside: true,
+  fit: null,
+};
+const P_AVATAR = -3.6;
+const PORTRAIT: Layout = {
+  table: { w: 5.8, d: 4.0, turn: true, see: 0.72 }, // the brain behind shows through the felt
+  seat: { you: 1.9, fly: -1.95 },
+  avatarZ: P_AVATAR,
+  avatarScale: 1.0,
+  boardZ: -0.05,
+  potZ: 0.75,
+  // The thinking bubble sits left of the fly's head, clear of its cards (they flip at showdown).
+  anchors: { fly: V(1.55, 0.55, P_AVATAR), you: V(-1.75, 0.1, 1.9), pot: V(0, 0.1, 1.2), verdict: V(0, 0.1, 2.85), bubble: V(-0.75, 1.3, P_AVATAR) },
+  bubbleBeside: true,
+  fit: [V(-2.3, 0, 3.2), V(2.3, 0, 3.2), V(-2.3, 0, -3.2), V(2.3, 0, -3.2), V(0, 1.75, P_AVATAR), V(-0.9, 1.55, P_AVATAR), V(0.9, 1.55, P_AVATAR)],
+};
 
 export class PlayTable {
   readonly fly = new FlyAvatar();
   /** Called whenever your best hand changes (after the deal and each board card). */
   onHand: (h: MadeHand, hole: string[], board: string[]) => void = () => {};
-  private rings = new SeatRings([NEAR_Z, FAR_Z]);
+  private L: Layout;
+  private rings: SeatRings;
   private faces = new Map<string, Card>();
   private yourCodes: string[] = [];
   private boardCodes: string[] = [];
@@ -59,21 +98,30 @@ export class PlayTable {
     },
   });
 
-  constructor(private canvas: HTMLCanvasElement, overlay: HTMLElement) {
+  constructor(
+    private canvas: HTMLCanvasElement,
+    overlay: HTMLElement,
+    { layout = "wide", maxPixelRatio = 2 }: { layout?: "wide" | "portrait"; maxPixelRatio?: number } = {},
+  ) {
+    this.L = layout === "portrait" ? PORTRAIT : WIDE;
+    this.rings = new SeatRings([this.L.seat.you, this.L.seat.fly]);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, maxPixelRatio));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.camera.position.set(0, 6.6, 5.8);
-    this.camera.lookAt(0, 0, -0.35); // framed to include the fly behind the far seat
+    if (this.L.fit) this.camera.position.set(0, 11, 2.6); // nearly overhead
+    else this.camera.position.set(0, 6.6, 5.8);
+    this.camera.lookAt(0, 0, this.L.fit ? -0.25 : -0.35); // framed to include the fly behind the far seat
+    this.fly.group.position.z = this.L.avatarZ;
+    this.fly.group.scale.setScalar(this.L.avatarScale);
 
-    buildTable(this.scene);
+    buildTable(this.scene, this.L.table);
     // The fly's seat glows while it thinks, in the brain's own colours.
     this.glow = new THREE.Mesh(
       new THREE.RingGeometry(0.95, 1.08, 64),
       new THREE.MeshBasicMaterial({ color: "#f7b538", transparent: true, opacity: 0, blending: THREE.AdditiveBlending }),
     );
     this.glow.rotation.x = -Math.PI / 2;
-    this.glow.position.set(0, 0.005, FAR_Z - 0.05);
+    this.glow.position.set(0, 0.005, this.L.seat.fly - 0.05);
     this.glow.scale.set(1.3, 0.55, 1);
     this.scene.add(this.glow, this.fly.group, this.rings.group);
     this.lensMaterial.uniforms.scene.value = this.target.texture;
@@ -88,7 +136,7 @@ export class PlayTable {
     this.labels = { fly: tag("tag--fly"), you: tag("tag--you"), pot: tag("tag--pot") };
     this.verdict = tag("verdict");
     this.bubble = document.createElement("div");
-    this.bubble.className = "bubble";
+    this.bubble.className = this.L.bubbleBeside ? "bubble" : "bubble bubble--below";
     this.bubble.hidden = true;
     overlay.append(this.bubble);
 
@@ -134,10 +182,10 @@ export class PlayTable {
         this.labels.pot.textContent = `Pot ${dollars(150)}`;
         for (let i = 0; i < 2; i++) {
           const mine = this.deal(e.human_cards[i]);
-          await mine.moveTo(new THREE.Vector3(-0.36 + i * 0.72, 0.01 + i * 0.002, SEAT_Z.you), true);
+          await mine.moveTo(new THREE.Vector3(-0.36 + i * 0.72, 0.01 + i * 0.002, this.L.seat.you), true);
           const theirs = this.deal(null);
           this.flyCards.push(theirs);
-          await theirs.moveTo(new THREE.Vector3(-0.36 + i * 0.72, 0.01 + i * 0.002, SEAT_Z.fly), false);
+          await theirs.moveTo(new THREE.Vector3(-0.36 + i * 0.72, 0.01 + i * 0.002, this.L.seat.fly), false);
         }
         this.hint();
         break;
@@ -148,7 +196,7 @@ export class PlayTable {
         for (let i = this.board.length; i < e.cards.length; i++) {
           const c = this.deal(e.cards[i]);
           this.board.push(c);
-          await c.moveTo(new THREE.Vector3(-1.44 + i * 0.72, 0.01, -0.1), true, 360);
+          await c.moveTo(new THREE.Vector3(-1.44 + i * 0.72, 0.01, this.L.boardZ), true, 360);
         }
         this.hint();
         break;
@@ -197,12 +245,12 @@ export class PlayTable {
         if (winner && loser) {
           this.labels[winner].classList.add("is-winner");
           this.labels[loser].classList.add("is-loser");
-          void this.rings.show(SEAT_Z[winner], WIN);
-          void this.rings.show(SEAT_Z[loser], LOSE);
+          void this.rings.show(this.L.seat[winner], WIN);
+          void this.rings.show(this.L.seat[loser], LOSE);
         }
         if (winner && this.pot.stack) {
           const s = this.pot.stack;
-          const from = s.position.clone(), to = new THREE.Vector3(1.2, 0, SEAT_Z[winner] * 0.85);
+          const from = s.position.clone(), to = new THREE.Vector3(1.2, 0, this.L.seat[winner] * 0.85);
           await tween(650, (k) => s.position.lerpVectors(from, to, k));
         }
         break;
@@ -240,8 +288,8 @@ export class PlayTable {
     b.amount += added;
     const old = b.stack;
     const stack = chipStack(b.amount);
-    const to = new THREE.Vector3(0.95, 0, SEAT_Z[seat] * 0.55);
-    stack.position.set(1.4, 0, SEAT_Z[seat] * 0.95);
+    const to = new THREE.Vector3(0.95, 0, this.L.seat[seat] * 0.55);
+    stack.position.set(1.4, 0, this.L.seat[seat] * 0.95);
     this.scene.add(stack);
     b.stack = stack;
     const from = stack.position.clone();
@@ -252,7 +300,7 @@ export class PlayTable {
   private async sweepBets(): Promise<void> {
     const moving = (Object.keys(this.bets) as Seat[]).filter((s) => this.bets[s].stack);
     if (!moving.length) return;
-    const center = new THREE.Vector3(0, 0, 0.42);
+    const center = new THREE.Vector3(0, 0, this.L.potZ);
     await Promise.all(
       moving.map((s) => {
         const st = this.bets[s].stack!, from = st.position.clone();
@@ -306,6 +354,10 @@ export class PlayTable {
     this.lensMaterial.uniforms.resolution.value.set(w * px, h * px);
     this.lensMaterial.uniforms.facet.value = FACET * px;
     this.camera.aspect = w / h;
+    if (this.L.fit) {
+      this.fitCamera(this.L.fit);
+      return;
+    }
     // Keep the whole table in frame on narrow screens.
     this.camera.fov = w / h < 1.6 ? 42 * (1.6 / (w / h)) ** 0.8 : 42;
     this.camera.updateProjectionMatrix();
@@ -316,12 +368,33 @@ export class PlayTable {
     el.style.transform = `translate(-50%, -50%) translate(${((v.x + 1) / 2) * this.canvas.clientWidth}px, ${((1 - v.y) / 2) * this.canvas.clientHeight}px)`;
   }
 
-  /** Right edge at the fly's left cheek, tail pointing at it; kept inside the canvas. */
+  /** The smallest field of view (portrait) that keeps every point in frame, whatever the aspect. */
+  private fitCamera(points: THREE.Vector3[]): void {
+    let lo = 10, hi = 110;
+    for (let k = 0; k < 18; k++) {
+      this.camera.fov = (lo + hi) / 2;
+      this.camera.updateProjectionMatrix();
+      this.camera.updateMatrixWorld();
+      const fits = points.every((p) => {
+        const v = p.clone().project(this.camera);
+        return Math.abs(v.x) <= 0.97 && Math.abs(v.y) <= 0.97;
+      });
+      if (fits) hi = this.camera.fov;
+      else lo = this.camera.fov;
+    }
+    this.camera.fov = hi;
+    this.camera.updateProjectionMatrix();
+  }
+
+  /** Wide: right edge at the fly's left cheek, tail pointing at it. Portrait: centred under the
+   * fly. Kept inside the canvas either way. */
   private placeBubble(): void {
-    const v = new THREE.Vector3(-0.95, 1.05, ROBOT_Z).project(this.camera);
+    const v = this.L.anchors.bubble.clone().project(this.camera);
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     const bw = this.bubble.offsetWidth, bh = this.bubble.offsetHeight;
-    const x = Math.max(8, ((v.x + 1) / 2) * w - bw), y = Math.min(Math.max(8, ((1 - v.y) / 2) * h - bh / 2), h - bh - 8);
+    const px = ((v.x + 1) / 2) * w, py = ((1 - v.y) / 2) * h;
+    const x = Math.min(Math.max(8, this.L.bubbleBeside ? px - bw : px - bw / 2), w - bw - 8);
+    const y = Math.min(Math.max(8, this.L.bubbleBeside ? py - bh / 2 : py), h - bh - 8);
     this.bubble.style.transform = `translate(${x}px, ${y}px)`;
   }
 
@@ -329,10 +402,11 @@ export class PlayTable {
     runTweens(now);
     this.fly.idle(now);
     this.rings.tick(now);
-    this.place(this.labels.fly, new THREE.Vector3(1.8, 1.1, ROBOT_Z));
-    this.place(this.labels.you, new THREE.Vector3(-2.1, 0.1, SEAT_Z.you));
-    this.place(this.labels.pot, new THREE.Vector3(0, 0.1, 0.7));
-    this.place(this.verdict, new THREE.Vector3(0, -0.2, 2.75));
+    const a = this.L.anchors;
+    this.place(this.labels.fly, a.fly);
+    this.place(this.labels.you, a.you);
+    this.place(this.labels.pot, a.pot);
+    this.place(this.verdict, a.verdict);
     if (!this.bubble.hidden) this.placeBubble();
     if (this.lens) {
       this.lensMaterial.uniforms.time.value = now / 1000;
