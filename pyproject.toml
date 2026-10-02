@@ -11,6 +11,7 @@ dependencies = [
     "pokerkit",
     "requests",
     "aiohttp>=3.14.3",
+    "torch>=2.14.1",
 ]
 
 [dependency-groups]

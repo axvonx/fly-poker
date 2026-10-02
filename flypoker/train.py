@@ -50,11 +50,11 @@ class TrainConfig:
     brain: dict = dataclasses.field(default_factory=dict)
 
 
-def make_fly(cfg: TrainConfig, data=None, threads: int = 1) -> Fly:
+def make_fly(cfg: TrainConfig, data=None, threads: int = 1, kernel: str = "csr") -> Fly:
     if cfg.arm == "nobrain":
         return Fly(None, Readout.zeros(N_FEATURES))
     bc = BrainConfig(wiring=cfg.arm, **cfg.brain)
-    brain = Brain(N_FEATURES, bc, data=data if data is not None else load(), threads=threads)
+    brain = Brain(N_FEATURES, bc, data=data if data is not None else load(), threads=threads, kernel=kernel)
     return Fly(brain, Readout.zeros(brain.n_readout))
 
 
@@ -140,12 +140,12 @@ def load_snapshot(path: Path) -> Readout:
 
 
 def train(run: Path, cfg: TrainConfig, max_hands: int | None = None, threads: int = 1,
-          throttle: float | None = None) -> None:
-    """`threads` and `throttle` are operational: they change wall-clock pace, never what
-    is learned per hand, so they may differ between resumes (each log line records them)."""
+          throttle: float | None = None, kernel: str = "csr") -> None:
+    """`threads`, `throttle` and `kernel` are operational: they change wall-clock pace, not
+    the model, so they may differ between resumes (each log line records them)."""
     (run / "ckpt").mkdir(parents=True, exist_ok=True)
     (run / "snapshots").mkdir(exist_ok=True)
-    fly = make_fly(cfg, threads=threads)
+    fly = make_fly(cfg, threads=threads, kernel=kernel)
     max_rate = cfg.max_hands_per_sec if throttle is None else throttle
     opt = Adam([fly.readout.W.shape, fly.readout.b.shape], cfg.lr)
     latest = run / "ckpt" / "latest.npz"
@@ -211,6 +211,7 @@ def train(run: Path, cfg: TrainConfig, max_hands: int | None = None, threads: in
                 "w_norm": float(np.linalg.norm(fly.readout.W)),
                 "threads": threads,
                 "throttle": max_rate,
+                "kernel": kernel,
             }
             with log.open("a") as f:
                 f.write(json.dumps(entry) + "\n")
@@ -235,6 +236,9 @@ def main() -> None:
     ap.add_argument("--arm", choices=("real", "shuffled", "nobrain"))
     ap.add_argument("--hands", type=int, default=None, help="stop after this many total hands")
     ap.add_argument("--threads", type=int, default=1, help="operational: threads for the connectome multiply")
+    ap.add_argument("--kernel", choices=("csr", "skip", "mps"), default="csr",
+                    help="operational: 'skip' skips silent neurons; 'mps' runs the brain on the GPU "
+                         "(both faster, with float32 rounding-level differences)")
     ap.add_argument("--throttle", type=float, default=None,
                     help="operational: max hands/sec, overriding the config (0 = unthrottled)")
     ap.add_argument("--set", action="append", default=[], metavar="KEY=JSON",
@@ -262,7 +266,7 @@ def main() -> None:
             "created": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
         cfg_path.write_text(json.dumps(meta, indent=2))
-    train(args.run, cfg, args.hands, threads=args.threads, throttle=args.throttle)
+    train(args.run, cfg, args.hands, threads=args.threads, throttle=args.throttle, kernel=args.kernel)
 
 
 if __name__ == "__main__":

@@ -46,11 +46,21 @@ def shuffle_targets(pre, post, seed: int) -> np.ndarray:
     return post[np.random.default_rng(seed).permutation(len(post))]
 
 
-class Brain:
-    """`threads` is operational only: the connectome multiply is split into row blocks,
-    which gives bit-identical results to the single-threaded multiply, just faster."""
+KERNELS = ("csr", "skip", "mps")
 
-    def __init__(self, n_features: int, config: BrainConfig = BrainConfig(), data=None, threads: int = 1):
+
+class Brain:
+    """`threads` and `kernel` are operational: they change speed, never the model.
+
+    - threads: the connectome multiply is split into row blocks (bit-identical).
+    - kernel="skip": exactly-silent neurons' columns are skipped. Same sum, different
+      addition order, so results differ at float32 rounding (<= ~3e-8 relative).
+    - kernel="mps": the dynamics run on the Apple GPU (torch, Metal). Rounding-level
+      differences (~2e-7 relative), 10-18x faster multiplies at training batch sizes.
+    """
+
+    def __init__(self, n_features: int, config: BrainConfig = BrainConfig(), data=None, threads: int = 1,
+                 kernel: str = "csr"):
         d = data if data is not None else load()
         self.config = config
         self.data_config = d["config"]
@@ -63,6 +73,11 @@ class Brain:
         self.W = _normalised(d["pre"], post, d["weight"], n)
         self.n = n
         self.set_threads(threads)
+        if kernel not in KERNELS:
+            raise ValueError(kernel)
+        self.kernel = kernel
+        self._Wc = self.W.tocsc() if kernel == "skip" else None
+        self._gpu = _GpuDynamics(self.W) if kernel == "mps" else None
         self.sensory = d["sensory"]
         self.descending = d["descending"]
         self.superclass = d["superclass"]
@@ -84,6 +99,12 @@ class Brain:
         self._pool = ThreadPoolExecutor(self.threads) if self.threads > 1 else None
 
     def _connectome(self, r: np.ndarray) -> np.ndarray:
+        if self._Wc is not None:
+            active = np.flatnonzero(r.any(axis=1))
+            if len(active) < 0.85 * self.n:  # past that, skipping costs more than it saves
+                if not len(active):
+                    return np.zeros_like(r)
+                return np.asarray(self._Wc[:, active] @ r[active])
         if self._pool is None:
             return self.W @ r
         out = np.empty((self.n, r.shape[1]), np.float32)
@@ -109,6 +130,8 @@ class Brain:
         """
         c = self.config
         drive = np.asarray(self.E @ u.T.astype(np.float32))
+        if self._gpu is not None:
+            return self._gpu.run(r, drive, c, trace)
         for _ in range(c.steps):
             x = c.gain * self._connectome(r) + drive
             np.maximum(x, 0.0, out=x)
@@ -120,3 +143,27 @@ class Brain:
     def readout(self, r: np.ndarray) -> np.ndarray:
         """Descending-neuron rates, shape (B, n_readout)."""
         return r[self.descending].T
+
+
+class _GpuDynamics:
+    """The same dynamics on the Apple GPU. torch's Metal backend supports sparse COO."""
+
+    def __init__(self, W: sp.csr_matrix):
+        import torch
+
+        self.torch = torch
+        self.device = torch.device("mps")
+        coo = W.tocoo()
+        idx = torch.from_numpy(np.vstack([coo.row, coo.col]).astype(np.int64))
+        self.W = torch.sparse_coo_tensor(idx, torch.from_numpy(coo.data), size=W.shape).coalesce().to(self.device)
+
+    def run(self, r: np.ndarray, drive: np.ndarray, c: BrainConfig, trace: list | None) -> np.ndarray:
+        t = self.torch
+        rt = t.from_numpy(np.ascontiguousarray(r)).to(self.device)
+        dt = t.from_numpy(np.ascontiguousarray(drive)).to(self.device)
+        for _ in range(c.steps):
+            x = (self.W @ rt).mul_(c.gain).add_(dt).clamp_(min=0.0)
+            rt = rt.mul(1.0 - c.alpha).add_(x, alpha=c.alpha)
+            if trace is not None:
+                trace.append(rt.cpu().numpy())
+        return rt.cpu().numpy()

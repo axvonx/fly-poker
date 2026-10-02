@@ -99,3 +99,31 @@ def test_threaded_brain_is_bit_identical():
     u = np.random.default_rng(1).random((3, 10)).astype(np.float32)
     one, four = Brain(10, BrainConfig(), data=d), Brain(10, BrainConfig(), data=d, threads=4)
     assert np.array_equal(one.run(one.zeros(3), u), four.run(four.zeros(3), u))
+
+
+@pytest.mark.skipif(not BRAIN.exists(), reason="run `python -m flypoker.data` first")
+def test_skip_kernel_matches_to_rounding():
+    from flypoker.brain import Brain, BrainConfig
+    from flypoker.data import load
+
+    d = load()
+    u = (np.random.default_rng(2).random((4, 10)) < 0.3).astype(np.float32)
+    csr, skip = Brain(10, BrainConfig(), data=d), Brain(10, BrainConfig(), data=d, kernel="skip")
+    a, b = csr.run(csr.zeros(4), u), skip.run(skip.zeros(4), u)
+    # Same sum in a different order: differences are float32 rounding, judged against the activity scale.
+    assert np.abs(a - b).max() <= 1e-6 * np.abs(a).max()
+
+
+@pytest.mark.skipif(not BRAIN.exists(), reason="run `python -m flypoker.data` first")
+def test_gpu_kernel_matches_to_rounding():
+    torch = pytest.importorskip("torch")
+    if not torch.backends.mps.is_available():
+        pytest.skip("no Apple GPU")
+    from flypoker.brain import Brain, BrainConfig
+    from flypoker.data import load
+
+    d = load()
+    u = (np.random.default_rng(3).random((4, 10)) < 0.3).astype(np.float32)
+    cpu, gpu = Brain(10, BrainConfig(), data=d), Brain(10, BrainConfig(), data=d, kernel="mps")
+    a, b = cpu.run(cpu.zeros(4), u), gpu.run(gpu.zeros(4), u)
+    assert np.abs(a - b).max() <= 1e-5 * np.abs(a).max()
