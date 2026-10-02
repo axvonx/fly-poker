@@ -100,7 +100,10 @@ async function boot(): Promise<void> {
   buildHowTo($("ranks"));
   const sheet = $("how-sheet") as HTMLDialogElement;
   $("how").addEventListener("click", () => sheet.showModal());
-  sheet.addEventListener("click", (e) => e.target === sheet && sheet.close()); // click outside to close
+  sheet.addEventListener("click", (e) => {
+    const r = sheet.getBoundingClientRect(); // click outside to close
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) sheet.close();
+  });
 
   // ── the lens ──
   const lens = $("lens");
@@ -191,9 +194,9 @@ async function boot(): Promise<void> {
   };
 
   const bar = new Bar(
-    async (action) => {
+    (action) => {
       const g = generation;
-      await play(await call({ type: "act", action }), g);
+      call({ type: "act", action }).then((r) => play(r, g)).catch((err: unknown) => fail(err instanceof Error ? err.message : String(err)));
     },
     () => void deal(),
   );
@@ -218,15 +221,16 @@ async function boot(): Promise<void> {
   };
   slider.addEventListener("input", showPick);
   slider.addEventListener("change", async () => {
-    generation++;
+    const g = ++generation;
     table.reset();
     brain.rest();
     bar.wait();
     bar.hand(null, null);
     await load();
-    void deal();
+    if (g === generation) void deal(); // a later change deals its own hand
   });
   showPick();
+  slider.disabled = true; // until the brain is loaded, or a change would deal a second hand
 
   // ── first load: the connectome (~16 MB) ──
   const mb = (b: number) => (b / 1e6).toFixed(1);
@@ -237,6 +241,7 @@ async function boot(): Promise<void> {
     ($("loading-fill") as HTMLElement).style.transform = `scaleX(${Math.min(1, loaded / t)})`;
   });
   $("loading").hidden = true;
+  slider.disabled = false;
   await deal();
 }
 

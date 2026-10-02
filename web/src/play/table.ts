@@ -184,7 +184,7 @@ export class PlayTable {
         if (e.showdown) {
           this.setTag("you", null, handWords(hands.you));
           this.setTag("fly", null, handWords(hands.fly));
-          markShowdown(this.faces, winner ? hands[winner] : hands.you, loser ? hands[loser] : hands.fly);
+          markShowdown(this.faces, winner ? [hands[winner]] : [hands.you, hands.fly], loser ? hands[loser] : null);
         } else {
           for (const c of this.faces.values()) c.highlight(null);
         }

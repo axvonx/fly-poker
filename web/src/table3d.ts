@@ -117,7 +117,7 @@ export class Card {
     this.group.rotation.x = Math.PI / 2; // lying flat, face down
   }
   private outline: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial | THREE.ShaderMaterial> | null = null;
-  private lifted = false;
+  private restY: number | null = null; // height before the lift, while lifted
   /** A coloured border (and a small lift) marks the cards that make a hand; null removes it.
    * Two colours: a card in both players' hands, its border half each, circling the edge. */
   highlight(color: string | null, second?: string): void {
@@ -132,11 +132,13 @@ export class Card {
         material instanceof THREE.ShaderMaterial ? (material.uniforms.opacity.value = 0.95 * k) : (material.opacity = 0.95 * k);
       void tween(350, fade);
     }
+    // Tween to an absolute height: highlight(null) then highlight(colour) in one frame must not stack.
     const lift = color !== null;
-    if (lift !== this.lifted) {
-      const y0 = this.group.position.y, dy = lift ? 0.06 : -0.06;
-      this.lifted = lift;
-      void tween(300, (k) => (this.group.position.y = y0 + dy * k));
+    if (lift !== (this.restY !== null)) {
+      const rest = this.restY ?? this.group.position.y;
+      this.restY = lift ? rest : null;
+      const y0 = this.group.position.y, y1 = lift ? rest + 0.06 : rest;
+      void tween(300, (k) => (this.group.position.y = y0 + (y1 - y0) * k));
     }
   }
   reveal(code: string): void {
@@ -213,10 +215,11 @@ export class SeatRings {
   }
 }
 
-/** Light up a showdown: the winner's hand cards green, the loser's red, shared ones both. */
-export function markShowdown(cards: Map<string, Card>, winner: MadeHand | null, loser: MadeHand | null): void {
+/** Light up a showdown: the winner's hand cards green, the loser's red, shared ones both.
+ * On a split pot pass both hands as winners and no loser. */
+export function markShowdown(cards: Map<string, Card>, winners: MadeHand[], loser: MadeHand | null): void {
   for (const c of cards.values()) c.highlight(null);
-  const win = new Set(winner?.core ?? []), lose = new Set(loser?.core ?? []);
+  const win = new Set(winners.flatMap((h) => h.core)), lose = new Set(loser?.core ?? []);
   for (const code of lose) if (!win.has(code)) cards.get(code)?.highlight(LOSE);
   for (const code of win) cards.get(code)?.highlight(WIN, lose.has(code) ? LOSE : undefined);
 }
@@ -495,7 +498,7 @@ export class Table3D {
             opponent: describe([...m.opponent_cards, ...board]),
           };
           for (const seat of ["fly", "opponent"] as Seat[]) this.setTag(seat, null, handWords(hands[seat]));
-          markShowdown(this.faces, winner ? hands[winner] : hands.fly, loser ? hands[loser] : hands.opponent);
+          markShowdown(this.faces, winner ? [hands[winner]] : [hands.fly, hands.opponent], loser ? hands[loser] : null);
         }
         if (winner && loser) {
           this.labels[winner].classList.add("is-winner");
