@@ -1,7 +1,8 @@
 # Build web/ and deploy it to GitHub Pages.
 #
-# The packed connectomes are too big to belong in git. They live as assets on the GitHub
-# Release tagged data-v1 (made once from tools/pack_connectome.py output) and are copied into
+# The packed connectomes and neuron positions are too big to belong in git. They live as assets on
+# the GitHub Release tagged data-v1 (made once from tools/pack_connectome.py and
+# tools/export_site_data.py output) and are copied into
 # the site at deploy time. Readout snapshots (web/public/snapshots, small) come from the repo.
 
 name: pages
@@ -47,7 +48,8 @@ jobs:
         run: |
           mkdir -p public/data
           gh release download "$DATA_RELEASE" --repo "$GITHUB_REPOSITORY" --dir public/data \
-            --pattern 'connectome-*.bin' --pattern 'connectome-*.json'
+            --pattern 'connectome-*.bin' --pattern 'connectome-*.json' \
+            --pattern 'neurons.bin' --pattern 'site.json'
           ls -l public/data
       - run: pnpm test # golden parity, including the fly cases now that the connectomes are here
       - name: Build (relative base: the site is served from /<repo>/)
