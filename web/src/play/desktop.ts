@@ -85,9 +85,9 @@ export class DesktopView implements PlayView {
     if (!this.introduced) {
       this.introduced = true; // once per load, at your first move (cards dealt, buttons live)
       void runIntro([
-        { rect: () => this.table.screenRect("fly"), text: "This is the fly, an AI built off a real brain" },
+        { rect: () => this.table.screenRect("fly"), text: "This is the fly" },
         { rect: () => this.table.screenRect("cards"), text: "These are your cards" },
-        { rect: () => $("actions").getBoundingClientRect(), text: "These are your actions, click these" },
+        { rect: () => $("actions").getBoundingClientRect(), text: "These are your actions" },
       ]);
     }
   }
