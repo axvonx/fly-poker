@@ -9,6 +9,7 @@ fixed, seeded group of sensory neurons. Nothing here is ever trained.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 import numpy as np
@@ -46,7 +47,10 @@ def shuffle_targets(pre, post, seed: int) -> np.ndarray:
 
 
 class Brain:
-    def __init__(self, n_features: int, config: BrainConfig = BrainConfig(), data=None):
+    """`threads` is operational only: the connectome multiply is split into row blocks,
+    which gives bit-identical results to the single-threaded multiply, just faster."""
+
+    def __init__(self, n_features: int, config: BrainConfig = BrainConfig(), data=None, threads: int = 1):
         d = data if data is not None else load()
         self.config = config
         self.data_config = d["config"]
@@ -58,6 +62,7 @@ class Brain:
             raise ValueError(config.wiring)
         self.W = _normalised(d["pre"], post, d["weight"], n)
         self.n = n
+        self.set_threads(threads)
         self.sensory = d["sensory"]
         self.descending = d["descending"]
         self.superclass = d["superclass"]
@@ -70,6 +75,25 @@ class Brain:
             shape=(n, n_features),
         )
         self.n_features = n_features
+
+    def set_threads(self, threads: int) -> None:
+        self.threads = max(1, threads)
+        bounds = np.linspace(0, self.n, self.threads + 1).astype(int)
+        self._rows = list(zip(bounds[:-1], bounds[1:]))
+        self._blocks = [self.W[lo:hi] for lo, hi in self._rows]
+        self._pool = ThreadPoolExecutor(self.threads) if self.threads > 1 else None
+
+    def _connectome(self, r: np.ndarray) -> np.ndarray:
+        if self._pool is None:
+            return self.W @ r
+        out = np.empty((self.n, r.shape[1]), np.float32)
+
+        def block(i: int) -> None:
+            lo, hi = self._rows[i]
+            out[lo:hi] = self._blocks[i] @ r
+
+        list(self._pool.map(block, range(self.threads)))
+        return out
 
     @property
     def n_readout(self) -> int:
@@ -86,7 +110,7 @@ class Brain:
         c = self.config
         drive = np.asarray(self.E @ u.T.astype(np.float32))
         for _ in range(c.steps):
-            x = c.gain * (self.W @ r) + drive
+            x = c.gain * self._connectome(r) + drive
             np.maximum(x, 0.0, out=x)
             r = (1.0 - c.alpha) * r + c.alpha * x
             if trace is not None:

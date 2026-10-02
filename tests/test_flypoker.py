@@ -88,3 +88,14 @@ def test_kill_and_resume(tmp_path):
     assert after == sorted(set(after)), "log must be strictly increasing in hands"
     assert after[-1] >= before[-1] + 96
     assert (run / "snapshots" / "h000000000.npz").exists()
+
+
+@pytest.mark.skipif(not BRAIN.exists(), reason="run `python -m flypoker.data` first")
+def test_threaded_brain_is_bit_identical():
+    from flypoker.brain import Brain, BrainConfig
+    from flypoker.data import load
+
+    d = load()
+    u = np.random.default_rng(1).random((3, 10)).astype(np.float32)
+    one, four = Brain(10, BrainConfig(), data=d), Brain(10, BrainConfig(), data=d, threads=4)
+    assert np.array_equal(one.run(one.zeros(3), u), four.run(four.zeros(3), u))

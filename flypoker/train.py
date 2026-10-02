@@ -50,11 +50,11 @@ class TrainConfig:
     brain: dict = dataclasses.field(default_factory=dict)
 
 
-def make_fly(cfg: TrainConfig, data=None) -> Fly:
+def make_fly(cfg: TrainConfig, data=None, threads: int = 1) -> Fly:
     if cfg.arm == "nobrain":
         return Fly(None, Readout.zeros(N_FEATURES))
     bc = BrainConfig(wiring=cfg.arm, **cfg.brain)
-    brain = Brain(N_FEATURES, bc, data=data if data is not None else load())
+    brain = Brain(N_FEATURES, bc, data=data if data is not None else load(), threads=threads)
     return Fly(brain, Readout.zeros(brain.n_readout))
 
 
@@ -139,10 +139,14 @@ def load_snapshot(path: Path) -> Readout:
     return Readout(z["W"], z["b"], z["mu"], z["sd"])
 
 
-def train(run: Path, cfg: TrainConfig, max_hands: int | None = None) -> None:
+def train(run: Path, cfg: TrainConfig, max_hands: int | None = None, threads: int = 1,
+          throttle: float | None = None) -> None:
+    """`threads` and `throttle` are operational: they change wall-clock pace, never what
+    is learned per hand, so they may differ between resumes (each log line records them)."""
     (run / "ckpt").mkdir(parents=True, exist_ok=True)
     (run / "snapshots").mkdir(exist_ok=True)
-    fly = make_fly(cfg)
+    fly = make_fly(cfg, threads=threads)
+    max_rate = cfg.max_hands_per_sec if throttle is None else throttle
     opt = Adam([fly.readout.W.shape, fly.readout.b.shape], cfg.lr)
     latest = run / "ckpt" / "latest.npz"
     log = run / "log.jsonl"
@@ -205,6 +209,8 @@ def train(run: Path, cfg: TrainConfig, max_hands: int | None = None) -> None:
                 "entropy": float(np.mean(ents)) if ents else None,
                 "actions": dict(zip(ACTIONS, (acts / max(acts.sum(), 1)).round(4).tolist())),
                 "w_norm": float(np.linalg.norm(fly.readout.W)),
+                "threads": threads,
+                "throttle": max_rate,
             }
             with log.open("a") as f:
                 f.write(json.dumps(entry) + "\n")
@@ -217,8 +223,8 @@ def train(run: Path, cfg: TrainConfig, max_hands: int | None = None) -> None:
             ents.clear()
             t_interval = now
 
-        if cfg.max_hands_per_sec:
-            wait = n / cfg.max_hands_per_sec - (time.time() - t_batch)
+        if max_rate:
+            wait = n / max_rate - (time.time() - t_batch)
             if wait > 0:
                 time.sleep(wait)
 
@@ -228,6 +234,9 @@ def main() -> None:
     ap.add_argument("run", type=Path)
     ap.add_argument("--arm", choices=("real", "shuffled", "nobrain"))
     ap.add_argument("--hands", type=int, default=None, help="stop after this many total hands")
+    ap.add_argument("--threads", type=int, default=1, help="operational: threads for the connectome multiply")
+    ap.add_argument("--throttle", type=float, default=None,
+                    help="operational: max hands/sec, overriding the config (0 = unthrottled)")
     ap.add_argument("--set", action="append", default=[], metavar="KEY=JSON",
                     help="override a TrainConfig field, e.g. --set lr=1e-3 --set brain='{\"gain\":0.8}'")
     args = ap.parse_args()
@@ -253,7 +262,7 @@ def main() -> None:
             "created": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
         cfg_path.write_text(json.dumps(meta, indent=2))
-    train(args.run, cfg, args.hands)
+    train(args.run, cfg, args.hands, threads=args.threads, throttle=args.throttle)
 
 
 if __name__ == "__main__":
