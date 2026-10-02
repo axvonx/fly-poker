@@ -9,6 +9,10 @@
     <main class="stage">
       <section class="game" aria-label="The hand being played">
         <h1 class="title">A fruit fly's nervous system, playing poker</h1>
+        <div class="played">
+          <p class="hud__label">Hands played</p>
+          <p class="counter" id="hands">—</p>
+        </div>
         <button class="lens-toggle" id="lens" type="button" aria-pressed="false">Fly's-eye view <kbd>F</kbd></button>
         <canvas id="table"></canvas>
         <div class="tags" id="tags" aria-live="polite"></div>
@@ -21,10 +25,8 @@
         </div>
         <ol class="readout" id="readout" aria-label="How strongly each choice is firing"></ol>
         <div class="hud__training">
-          <p class="hud__label">Hands played since 1 Oct</p>
-          <p class="counter" id="hands">—</p>
-          <p class="hud__note" id="pace"></p>
-          <svg id="training-graph" viewBox="0 0 360 110" role="img" aria-label="Winnings against each bot during training"></svg>
+          <p class="hud__label">Winnings</p>
+          <svg id="training-graph" viewBox="0 0 360 72" role="img" aria-label="Winnings against each bot during training"></svg>
           <ul class="legend" id="legend"></ul>
         </div>
       </section>

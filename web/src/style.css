@@ -65,9 +65,12 @@ ol { list-style: none; }
   line-height: 1;
 }
 
+.played { position: absolute; top: var(--gap); right: var(--gap); z-index: 1; text-align: right; }
+.played .hud__label { margin-bottom: calc(var(--u) * 0.4); }
+
 .lens-toggle {
   position: absolute;
-  top: var(--gap);
+  bottom: var(--gap);
   right: var(--gap);
   z-index: 1;
   display: flex;
@@ -119,14 +122,11 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 0.35em; border: 1p
   margin-bottom: var(--u);
   font-family: var(--display);
   font-weight: 500;
-  font-size: calc(var(--u) * 1.4);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: calc(var(--u) * 1.6);
   color: var(--graphite);
 }
 
 .hud__training { display: grid; gap: calc(var(--u) * 0.5); align-content: start; }
-.hud__note { color: var(--graphite); font-size: calc(var(--u) * 1.2); }
 .counter {
   font-family: var(--mono);
   font-weight: 500;
@@ -248,7 +248,7 @@ body.is-offline::after {
     grid-template-areas: "game" "hud" "specimen";
   }
   .hud { grid-template-columns: 1fr; }
-  .lens-toggle { top: auto; bottom: var(--gap); }
+
 }
 
 @media (prefers-reduced-motion: reduce) {

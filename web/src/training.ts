@@ -35,7 +35,6 @@ export class Training {
     this.hands = m.real.hands;
     this.perSec = m.real.hands_per_sec;
     this.stamp = performance.now();
-    $("pace").textContent = `About ${Math.round(this.perSec * 3600).toLocaleString()} an hour · winnings per 100 hands, smoothed`;
     if (m.series) this.graph(m.series);
   }
 
@@ -43,7 +42,7 @@ export class Training {
     const svg = $("training-graph");
     svg.replaceChildren();
     if (series.length < 2) return;
-    const W = 360, H = 110, pad = 4;
+    const W = 360, H = 72, pad = 4;
     const lines = TRAINING_BOTS.map((o) => {
       let ema: number | null = null;
       return series.map((p) => {
