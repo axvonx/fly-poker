@@ -1,0 +1,310 @@
+/* Fly at the Table — a live microscopy figure, read from across a gym.
+   Tokens: slide black, coverslip, label paper (ink only), graphite, ImageJ "Fire". */
+
+:root {
+  --slide: #0b0a10;
+  --coverslip: #1a1822;
+  --coverslip-edge: #2b2836;
+  --paper: #ede6d6;
+  --graphite: #8a8594;
+  --fire-0: #2a0b3d;
+  --fire-1: #8c1d5b;
+  --fire-2: #e0533a;
+  --fire-3: #f7b538;
+  --fire-4: #fff6d8;
+  --fire: linear-gradient(90deg, var(--fire-0), var(--fire-1), var(--fire-2), var(--fire-3), var(--fire-4));
+
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Sized for a 1080p booth monitor; scales with the viewport. */
+  --u: clamp(10px, 0.95vmin, 16px);
+  --gap: calc(var(--u) * 2);
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--slide);
+  color: var(--paper);
+  font-family: var(--body);
+  font-size: calc(var(--u) * 1.6);
+  line-height: 1.35;
+}
+
+p, ol { margin: 0; padding: 0; }
+ol { list-style: none; }
+
+.eyebrow {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: calc(var(--u) * 1.4);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--graphite);
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(calc(var(--u) * 30), 26%);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "specimen rail" "table rail";
+  height: 100vh;
+  gap: var(--gap);
+  padding: var(--gap);
+}
+
+/* ── The specimen ───────────────────────────────────── */
+
+.specimen {
+  grid-area: specimen;
+  position: relative;
+  min-height: 0;
+}
+
+#brain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.specimen__label { position: relative; z-index: 1; max-width: 46ch; }
+
+.specimen__label .eyebrow {
+  font-size: calc(var(--u) * 3.4);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  font-weight: 700;
+  color: var(--paper);
+}
+
+.specimen__meta {
+  margin-top: var(--u);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 1.25);
+  color: var(--graphite);
+  max-width: 44ch;
+}
+
+.specimen__overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 1.2);
+  color: var(--graphite);
+}
+
+.axis {
+  position: absolute;
+  right: 0;
+  top: 0;
+  letter-spacing: 0.06em;
+}
+.axis span::before { content: "↑ "; }
+
+.scalebar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: grid;
+  gap: calc(var(--u) * 0.5);
+}
+.scalebar__bar { height: 3px; background: var(--paper); }
+
+.lut {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: calc(var(--u) * 6);
+  row-gap: calc(var(--u) * 0.5);
+}
+.lut__ramp { grid-column: 1 / -1; height: calc(var(--u) * 0.8); background: var(--fire); }
+.lut__text:last-child { text-align: right; }
+
+.clock {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  font-size: calc(var(--u) * 1.6);
+  color: var(--paper);
+}
+
+/* ── The table ──────────────────────────────────────── */
+
+.table {
+  grid-area: table;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(calc(var(--u) * 34), 38%);
+  align-items: center;
+  gap: calc(var(--gap) * 1.5);
+  padding: var(--gap);
+  background: var(--coverslip);
+  border: 1px solid var(--coverslip-edge);
+}
+
+.seat { display: grid; gap: calc(var(--u) * 0.6); justify-items: start; }
+.seat__name {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: calc(var(--u) * 2);
+}
+.seat--fly .seat__name { color: var(--fire-3); }
+.seat__last { font-family: var(--mono); color: var(--graphite); min-height: 1.35em; }
+
+.board { display: grid; gap: calc(var(--u) * 0.8); justify-items: center; }
+.pot { font-family: var(--mono); font-size: calc(var(--u) * 1.6); min-height: 1.35em; }
+
+.cards { display: flex; gap: calc(var(--u) * 0.6); min-height: calc(var(--u) * 7.2); }
+
+.card {
+  width: calc(var(--u) * 5.2);
+  height: calc(var(--u) * 7.2);
+  border-radius: calc(var(--u) * 0.5);
+  background: var(--paper);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  line-height: 1;
+  font-family: var(--display);
+  font-weight: 700;
+  animation: deal 260ms ease-out both;
+}
+.card__rank { font-size: calc(var(--u) * 2.8); }
+.card__suit { font-size: calc(var(--u) * 2.4); }
+.card--black { color: var(--slide); }
+.card--red { color: #b3261e; }
+.card--down {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(var(--u) * 0.45), rgb(237 230 214 / 0.07) 0 calc(var(--u) * 0.55)),
+    var(--coverslip-edge);
+  border: 1px solid #3a3646;
+}
+
+@keyframes deal {
+  from { transform: translateY(calc(var(--u) * -0.8)); opacity: 0; }
+}
+
+/* The five choices, filled from the descending-neuron readout. */
+.readout { display: grid; gap: calc(var(--u) * 0.5); }
+.readout__row {
+  display: grid;
+  grid-template-columns: calc(var(--u) * 10) minmax(0, 1fr) calc(var(--u) * 4);
+  align-items: center;
+  gap: var(--u);
+  font-size: calc(var(--u) * 1.35);
+}
+.readout__label { color: var(--graphite); }
+.readout__track { height: calc(var(--u) * 1.1); background: var(--slide); overflow: hidden; }
+.readout__fill {
+  display: block;
+  height: 100%;
+  background: var(--fire-1);
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.readout__value { font-family: var(--mono); text-align: right; }
+.readout__row.is-chosen .readout__label { color: var(--paper); font-weight: 600; }
+.readout__row.is-chosen .readout__fill { background: var(--fire-3); }
+.readout__row.is-illegal { opacity: 0.3; }
+
+/* ── The rail ───────────────────────────────────────── */
+
+.rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 1.2);
+  min-height: 0;
+}
+
+.rail__block { display: grid; gap: calc(var(--u) * 0.6); }
+.rail__note { color: var(--graphite); font-size: calc(var(--u) * 1.25); }
+
+.counter {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: calc(var(--u) * 4.4);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ladder { display: grid; gap: 1px; background: var(--coverslip-edge); border: 1px solid var(--coverslip-edge); }
+.rung {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "name verdict" "blurb verdict";
+  column-gap: var(--u);
+  padding: calc(var(--u) * 0.8) var(--u);
+  background: var(--coverslip);
+}
+.rung__name { grid-area: name; font-family: var(--display); font-weight: 700; font-size: calc(var(--u) * 1.7); }
+.rung__blurb { grid-area: blurb; color: var(--graphite); font-size: calc(var(--u) * 1.2); }
+.rung__verdict {
+  grid-area: verdict;
+  align-self: center;
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 1.15);
+  color: var(--graphite);
+}
+.rung__verdict[data-verdict="beats"] { color: var(--fire-3); }
+.rung__verdict[data-verdict="loses"] { color: var(--fire-2); }
+
+#curve { width: 100%; height: auto; background: var(--coverslip); }
+.curve__zero { stroke: var(--graphite); stroke-dasharray: 3 4; }
+.curve__band { fill: rgb(140 29 91 / 0.35); }
+.curve__line { fill: none; stroke: var(--fire-3); stroke-width: 2; }
+
+.ask {
+  margin-top: auto;
+  padding-top: var(--gap);
+  border-top: 1px solid var(--coverslip-edge);
+  font-family: var(--display);
+  font-size: calc(var(--u) * 2.2);
+  line-height: 1.15;
+}
+.ask strong { color: var(--fire-3); font-weight: 700; }
+
+/* ── States ─────────────────────────────────────────── */
+
+body.is-offline::after {
+  content: "Not connected to the brain server. Start it with: uv run python -m flypoker.server";
+  position: fixed;
+  left: 50%;
+  top: var(--gap);
+  transform: translateX(-50%);
+  padding: var(--u) calc(var(--u) * 2);
+  background: var(--fire-2);
+  color: var(--slide);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 1.3);
+}
+
+@media (max-width: 900px) {
+  .stage {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 70vh auto auto;
+    grid-template-areas: "specimen" "table" "rail";
+  }
+  .table { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+  .readout__fill { transition: none; }
+}

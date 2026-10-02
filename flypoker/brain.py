@@ -78,14 +78,19 @@ class Brain:
     def zeros(self, batch: int) -> np.ndarray:
         return np.zeros((self.n, batch), dtype=np.float32)
 
-    def run(self, r: np.ndarray, u: np.ndarray) -> np.ndarray:
-        """Advance states r (n, B) for config.steps steps under inputs u (B, F)."""
+    def run(self, r: np.ndarray, u: np.ndarray, trace: list | None = None) -> np.ndarray:
+        """Advance states r (n, B) for config.steps steps under inputs u (B, F).
+
+        If `trace` is given, the state after every step is appended to it (for display).
+        """
         c = self.config
         drive = np.asarray(self.E @ u.T.astype(np.float32))
         for _ in range(c.steps):
             x = c.gain * (self.W @ r) + drive
             np.maximum(x, 0.0, out=x)
             r = (1.0 - c.alpha) * r + c.alpha * x
+            if trace is not None:
+                trace.append(r)
         return r
 
     def readout(self, r: np.ndarray) -> np.ndarray:

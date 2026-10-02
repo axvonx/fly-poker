@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fly at the Table</title>
+  </head>
+  <body>
+    <main class="stage">
+      <section class="specimen" aria-label="The fly's nervous system">
+        <header class="specimen__label">
+          <p class="eyebrow">A fruit fly's nervous system, playing poker</p>
+          <p class="specimen__meta" id="specimen-meta">MaleCNS v1.0 · 166,700 neurons</p>
+        </header>
+        <canvas id="brain"></canvas>
+        <div class="specimen__overlay" aria-hidden="true">
+          <div class="axis"><span>anterior</span></div>
+          <div class="scalebar" id="scalebar"><span class="scalebar__bar"></span><span class="scalebar__text">100 µm</span></div>
+          <div class="lut"><span class="lut__ramp"></span><span class="lut__text">resting</span><span class="lut__text">firing</span></div>
+          <p class="clock" id="clock">t = 0 / 8</p>
+        </div>
+      </section>
+
+      <section class="table" aria-label="The hand being played">
+        <div class="seat seat--opponent">
+          <p class="seat__name" id="opponent-name">—</p>
+          <div class="cards" id="opponent-cards"></div>
+          <p class="seat__last" id="opponent-last"></p>
+        </div>
+        <div class="board">
+          <div class="cards" id="board"></div>
+          <p class="pot" id="pot"></p>
+        </div>
+        <div class="seat seat--fly">
+          <p class="seat__name">The fly</p>
+          <div class="cards" id="fly-cards"></div>
+          <p class="seat__last" id="fly-last"></p>
+        </div>
+        <ol class="readout" id="readout" aria-label="How strongly each choice is firing"></ol>
+      </section>
+
+      <aside class="rail">
+        <div class="rail__block">
+          <p class="eyebrow">Hands played since 1 Oct</p>
+          <p class="counter" id="hands">—</p>
+          <p class="rail__note" id="pace"></p>
+        </div>
+        <div class="rail__block">
+          <p class="eyebrow">Which of these can it beat?</p>
+          <ol class="ladder" id="ladder"></ol>
+        </div>
+        <div class="rail__block rail__block--curve">
+          <p class="eyebrow">Winnings against the equity bot</p>
+          <svg id="curve" viewBox="0 0 320 160" role="img" aria-label="Learning curve"></svg>
+          <p class="rail__note" id="curve-note"></p>
+        </div>
+        <p class="ask">Which one will it beat by October 17?<br /><strong>Nobody knows yet. Tell us your guess.</strong></p>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
