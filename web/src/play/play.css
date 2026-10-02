@@ -81,7 +81,8 @@
 .bar__main { min-width: 0; display: grid; gap: var(--gap); }
 [hidden] { display: none !important; }
 
-.actions__row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--u); }
+.actions { display: grid; gap: var(--u); }
+.actions__row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--u); }
 .act {
   display: grid;
   gap: calc(var(--u) * 0.2);
@@ -106,6 +107,30 @@
 .act--call:not(:disabled) { background: var(--fire-3); color: var(--slide); }
 .act--call:not(:disabled) .act__detail { color: var(--slide); }
 .act--fold:not(:disabled) { color: var(--fire-2); border-color: var(--fire-2); }
+
+/* How much to raise (play/raise.ts, on both pages): chips for the usual sizes set the amount, the
+   slider and − / + pick any other; the Raise button commits. The chosen chip is filled. */
+.raise { display: flex; flex-wrap: wrap; align-items: center; gap: var(--u); }
+.raise__chips { display: flex; gap: calc(var(--u) * 0.5); }
+.raise__chip, .raise__step {
+  min-height: 32px;
+  padding: 0 var(--u);
+  background: transparent;
+  color: var(--paper);
+  border: 1px solid var(--coverslip-edge);
+  border-radius: 16px;
+  font: 600 calc(var(--u) * 1.2) var(--body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.raise__chip:hover:not(:disabled), .raise__step:hover:not(:disabled) { border-color: var(--fire-3); }
+.raise__chip[aria-pressed="true"]:not(:disabled) { background: var(--fire-3); border-color: var(--fire-3); color: var(--slide); }
+.raise__chip:disabled, .raise__step:disabled, .raise__slider:disabled { opacity: 0.35; cursor: default; }
+.raise__chip[hidden], .raise__step[hidden], .raise__slider[hidden] { display: none; }
+.raise__step { width: 32px; padding: 0; font: 500 calc(var(--u) * 1.5) var(--mono); }
+.raise__slide { flex: 1 1 12rem; min-width: 0; display: flex; align-items: center; gap: calc(var(--u) * 0.5); }
+.raise__slider { flex: 1; min-width: 0; accent-color: var(--fire-3); }
+.raise__chip:focus-visible, .raise__step:focus-visible, .raise__slider:focus-visible { outline: 2px solid var(--fire-3); outline-offset: 2px; }
 .actions__row.is-turn .act:not(:disabled) { animation: turn-glow 1.4s ease-in-out 3; }
 @keyframes turn-glow { 50% { box-shadow: 0 0 18px 2px rgb(247 181 56 / 0.55); } }
 
@@ -286,7 +311,6 @@
   .score { text-align: left; display: flex; align-items: baseline; gap: var(--u); }
   .score .hud__label { margin: 0; }
   .score .counter { font-size: calc(var(--u) * 2.6); }
-  .actions__row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .rank { grid-template-columns: minmax(0, 1fr) auto; }
   .rank__cards { grid-row: 2; }
   .rank__odds { grid-row: 1; grid-column: 2; }

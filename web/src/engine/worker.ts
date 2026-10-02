@@ -4,6 +4,7 @@
 //   w.postMessage({ type: "load", arm: "real", snapshotUrl: "snapshots/real/h000870000.f32", snapshotHands: 870000 });
 //   w.postMessage({ type: "newHand", seed: 42, humanSeat: 1 });
 //   w.postMessage({ type: "act", action: 1 });
+//   w.postMessage({ type: "raise", to: 750 });
 //
 // Replies: { type: "progress", loaded, total } (connectome download) | { type: "loaded", ... } | { type: "events", events, frames } | { type: "error", message }.
 // frames (when options.frames) are whole-brain activity bytes, one per dynamics step, transferred.
@@ -17,7 +18,8 @@ export type Arm = "real" | "shuffled" | "nobrain";
 export type Request =
   | { type: "load"; arm: Arm; snapshotUrl: string; snapshotHands?: number; connectomeUrl?: string; options?: SessionOptions }
   | { type: "newHand"; seed: number; humanSeat: number }
-  | { type: "act"; action: number };
+  | { type: "act"; action: number }
+  | { type: "raise"; to: number }; // any legal street total, not only the preset sizes
 
 export type Reply =
   | { type: "progress"; loaded: number; total: number }
@@ -55,7 +57,10 @@ async function handle(req: Request): Promise<void> {
   }
   if (!session) throw new Error("load a fly first");
   const frames: Uint8Array[] = [];
-  const events = req.type === "newHand" ? session.newHand(req.seed, req.humanSeat, frames) : session.act(req.action, frames);
+  const events =
+    req.type === "newHand" ? session.newHand(req.seed, req.humanSeat, frames)
+    : req.type === "raise" ? session.raiseTo(req.to, frames)
+    : session.act(req.action, frames);
   const buffers = frames.map((f) => f.buffer as ArrayBuffer);
   scope.postMessage({ type: "events", events, frames: buffers, ms: performance.now() - t0 }, buffers);
 }

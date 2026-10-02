@@ -4,6 +4,7 @@
 // sheet that slides up.
 
 import { BrainView } from "../../brain";
+import type { RaiseRange } from "../../engine/game";
 import type { Obs } from "../../engine/poker";
 import { HandPanel } from "../../handpanel";
 import type { BootData } from "../boot";
@@ -119,8 +120,9 @@ export class MobileView implements PlayView {
   }
 
   bind(ctl: PlayController): void {
-    this.dock = new Dock((a) => ctl.act(a), () => ctl.next());
+    this.dock = new Dock((a) => ctl.act(a), (to) => ctl.raise(to), () => ctl.next());
     this.q(".m-dockwrap").append(this.dock.el);
+    this.q(".m-stage").append(this.dock.panel);
     const slider = this.q<HTMLInputElement>(".m-practice input");
     const snaps = ctl.snapshots;
     slider.max = String(snaps.length - 1);
@@ -150,8 +152,8 @@ export class MobileView implements PlayView {
     this.brainCanvas.style.opacity = String(BRAIN_REST);
   }
 
-  turn(o: Obs, amounts: number[]): void {
-    this.dock.turn(o, amounts);
+  turn(o: Obs, amounts: number[], raise: RaiseRange | null): void {
+    this.dock.turn(o, amounts, raise);
     if (!this.introduced) {
       this.introduced = true; // once per load, at your first move (cards dealt, buttons live)
       void runIntro([

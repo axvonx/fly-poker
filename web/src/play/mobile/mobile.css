@@ -85,7 +85,7 @@ body.is-mobile { overflow: hidden; overscroll-behavior: none; }
 .m-dockwrap { padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
 .dock { display: grid; gap: 8px; }
 .dock__row { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 8px; }
-.dock__btn, .pick__btn, .dock__next {
+.dock__btn, .pick__go, .dock__next {
   display: grid;
   place-content: center;
   gap: 2px;
@@ -106,14 +106,36 @@ body.is-mobile { overflow: hidden; overscroll-behavior: none; }
 .dock__btn--call:not(:disabled) .btn__detail { color: var(--slide); }
 .dock__btn--fold:not(:disabled) { color: var(--fire-2); border-color: var(--fire-2); }
 .dock.is-turn .dock__btn:not(:disabled) { animation: turn-glow 1.4s ease-in-out 3; }
-.dock__btn:not(:disabled):active, .pick__btn:active { transform: scale(0.97); }
+.dock__btn:not(:disabled):active, .pick__go:not(:disabled):active { transform: scale(0.97); }
 .dock__btn--raise[aria-expanded="true"] { border-color: var(--fire-3); color: var(--fire-3); }
-.pick { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; animation: rise 180ms ease-out; }
+/* Raise ▴ opens this over the foot of the table (it lives in .m-stage), so the table never resizes.
+   The chips and slider are play/raise.ts, styled in play.css; here they get thumb-sized. */
+.pick {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 8px;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  background: var(--slide);
+  border: 1px solid var(--coverslip-edge);
+  border-radius: 16px;
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 0.45);
+  animation: rise 180ms ease-out;
+}
 .pick[hidden] { display: none; }
-.pick__btn { border-color: var(--fire-3); }
-.pick__btn[hidden] { display: none; }
+.pick .raise { display: grid; gap: 10px; }
+.pick .raise__chips { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.pick .raise__chip { min-height: 40px; padding: 0 4px; font-size: calc(var(--u) * 1.3); }
+.pick .raise__step { width: 44px; min-height: 44px; border-radius: 22px; }
+.pick .raise__slider { height: 44px; }
+.pick__go:not(:disabled) { background: var(--fire-3); color: var(--slide); border: 0; }
+.pick__go:not(:disabled) .btn__detail { color: var(--slide); }
+.pick__go:disabled { opacity: 0.35; }
 .dock__next { display: none; background: var(--fire-3); color: var(--slide); border: 0; }
-.dock.is-done .dock__row, .dock.is-done .pick { display: none; }
+.dock.is-done .dock__row { display: none; }
 .dock.is-done .dock__next { display: grid; animation: rise 220ms ease-out; }
 
 /* ── The sheet: everything that isn't the game ── */

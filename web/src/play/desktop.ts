@@ -2,6 +2,7 @@
 // big words, the training chart. The markup is in index.html (<main class="play">).
 
 import { BrainView } from "../brain";
+import type { RaiseRange } from "../engine/game";
 import type { Obs } from "../engine/poker";
 import { Bar } from "./bar";
 import type { BootData } from "./boot";
@@ -57,7 +58,7 @@ export class DesktopView implements PlayView {
 
   /** Wire the controls to the controller (they need it; it needs the view first). */
   bind(ctl: PlayController): void {
-    this.bar = new Bar((a) => ctl.act(a), () => ctl.next());
+    this.bar = new Bar((a) => ctl.act(a), (to) => ctl.raise(to), () => ctl.next());
     const snaps = ctl.snapshots;
     this.slider.max = String(snaps.length - 1);
     this.slider.value = String(ctl.pick);
@@ -80,14 +81,14 @@ export class DesktopView implements PlayView {
     this.brain.rest();
   }
 
-  turn(o: Obs, amounts: number[]): void {
-    this.bar.turn(o, amounts);
+  turn(o: Obs, amounts: number[], raise: RaiseRange | null): void {
+    this.bar.turn(o, amounts, raise);
     if (!this.introduced) {
       this.introduced = true; // once per load, at your first move (cards dealt, buttons live)
       void runIntro([
         { rect: () => this.table.screenRect("fly"), text: "This is the fly" },
         { rect: () => this.table.screenRect("cards"), text: "These are your cards" },
-        { rect: () => $("actions").getBoundingClientRect(), text: "These are your actions" },
+        { rect: () => $("bar-actions").getBoundingClientRect(), text: "These are your actions" },
       ]);
     }
   }

@@ -228,7 +228,7 @@ export class PlayTable {
         await Promise.all([this.fly.act(), this.contribute("fly", e.pot, e.action === "fold")]);
         break;
       case "action":
-        this.setTag("you", null, ACTION_LABEL[e.action]);
+        this.setTag("you", null, e.to && e.action !== "allin" ? `Raise to ${dollars(e.to)}` : ACTION_LABEL[e.action]);
         await this.contribute("you", e.pot, e.action === "fold");
         break;
       case "turn":

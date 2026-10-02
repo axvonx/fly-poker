@@ -2,7 +2,7 @@
 // onto the brain, keeps score, and hands everything to a view. Desktop and mobile are two views
 // of this one controller (play/desktop.ts, play/mobile/view.ts).
 
-import type { GameEvent } from "../engine/game";
+import type { GameEvent, RaiseRange } from "../engine/game";
 import type { Obs } from "../engine/poker";
 import type { Reply, Request } from "../engine/worker";
 import type { PlayTable } from "./table";
@@ -22,7 +22,7 @@ export interface PlayView {
   table: PlayTable;
   brainFrame(activity: Uint8Array, level: number): void; // one dynamics step while the fly thinks
   brainRest(): void;
-  turn(o: Obs, amounts: number[]): void; // your move: which actions are legal and what they cost
+  turn(o: Obs, amounts: number[], raise: RaiseRange | null): void; // your move: what's legal, what it costs, how much you may raise to
   wait(): void; // not your move
   done(thoughts: FlyThought[]): void; // the hand is over: show the fly's thinking and "Next hand"
   hand(hole: string[], board: string[]): void; // your best hand changed
@@ -83,12 +83,21 @@ export class PlayController {
 
   /** You act (index into ACTIONS). */
   act(action: number): void {
-    const g = this.generation;
-    this.call({ type: "act", action }).then((r) => this.play(r, g)).catch((err: unknown) => this.fail(err));
+    this.send({ type: "act", action });
+  }
+
+  /** You raise to a street total (in chips). */
+  raise(to: number): void {
+    this.send({ type: "raise", to });
   }
 
   next(): void {
     void this.deal();
+  }
+
+  private send(req: Request): void {
+    const g = this.generation;
+    this.call(req).then((r) => this.play(r, g)).catch((err: unknown) => this.fail(err));
   }
 
   private call(req: Request): Promise<Reply> {
@@ -159,7 +168,7 @@ export class PlayController {
       }
       if (e.type === "turn") {
         await view.table.handle(e);
-        if (g === this.generation) view.turn(e.obs, e.amounts);
+        if (g === this.generation) view.turn(e.obs, e.amounts, e.raise);
         continue;
       }
       if (e.type === "result") {

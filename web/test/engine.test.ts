@@ -8,8 +8,9 @@ import { describe, expect, it } from "vitest";
 import { Brain, gunzip, isGzip, parseConnectome, type Connectome } from "../src/engine/connectome";
 import { encode, N_FEATURES } from "../src/engine/features";
 import { Fly, Session } from "../src/engine/game";
-import { Hand, madeHand, type Obs } from "../src/engine/poker";
+import { ALLIN, HALF, Hand, madeHand, POT, type Obs } from "../src/engine/poker";
 import { parseReadout } from "../src/engine/readout";
+import { raiseStops } from "../src/play/raise";
 
 const root = new URL("..", import.meta.url).pathname;
 const golden = (name: string) => JSON.parse(readFileSync(`${root}test/golden/${name}`, "utf8"));
@@ -68,6 +69,67 @@ describe("poker rules match pokerkit", () => {
     const h = new Hand(rules[0].deck);
     h.act(1); // button completes
     expect(() => h.act(0)).toThrow(/illegal/); // big blind can't fold to no bet
+  });
+});
+
+describe("a person's raise of any size", () => {
+  // Preflop the button (seat 1) acts first: blinds 50/100, so pot 150 and 50 to call.
+  const fresh = () => new Hand(rules[0].deck);
+
+  it("reads a preset's exact amount as that preset, and any other size by its fraction of the pot", () => {
+    const h = fresh();
+    expect([h.minRaiseTo(), h.raiseAmountFor(HALF), h.raiseAmountFor(POT), h.maxRaiseTo()]).toEqual([200, 200, 300, 20_000]);
+    expect(h.raiseBucket(200)).toBe(HALF);
+    expect(h.raiseBucket(300)).toBe(POT);
+    expect(h.raiseBucket(20_000)).toBe(ALLIN);
+    expect(h.raiseBucket(240)).toBe(HALF); // raises 140 into 200: 0.7 of the pot
+    expect(h.raiseBucket(250)).toBe(POT); // 0.75
+    expect(h.raiseBucket(5_000)).toBe(POT);
+  });
+
+  it("plays a preset through actRaiseTo exactly as act() does", () => {
+    for (const a of [HALF, POT, ALLIN]) {
+      const viaAct = fresh();
+      viaAct.act(a);
+      const viaRaise = fresh();
+      viaRaise.actRaiseTo(viaRaise.raiseAmountFor(a));
+      expect(viaRaise.history).toEqual(viaAct.history);
+      expect(viaRaise.obs()).toEqual(viaAct.obs());
+    }
+  });
+
+  it("bets the exact amount and leaves the right call", () => {
+    const h = fresh();
+    h.actRaiseTo(730);
+    expect(h.history).toEqual([[1, 0, POT]]);
+    expect(h.obs()).toMatchObject({ seat: 0, pot: 830, to_call: 630 });
+  });
+
+  it("refuses raises outside the legal range, fractions of a chip, and raises when none is legal", () => {
+    expect(() => fresh().actRaiseTo(199)).toThrow();
+    expect(() => fresh().actRaiseTo(20_001)).toThrow();
+    expect(() => fresh().actRaiseTo(250.5)).toThrow();
+    const h = fresh();
+    h.act(ALLIN);
+    expect(() => h.actRaiseTo(20_000)).toThrow();
+  });
+
+  it("plays a hand against the fly, with the amount on the action event", () => {
+    const session = new Session(new Fly(null, readout("nobrain", "h000900000")));
+    let events = session.newHand(7, 1);
+    const turn = events[events.length - 1];
+    expect(turn).toMatchObject({ type: "turn", raise: { min: 200, max: 20_000 } });
+    events = session.raiseTo(450);
+    expect(events[0]).toEqual({ type: "action", who: "human", action: "pot", pot: 550, to: 450 });
+    let guard = 0;
+    while (events[events.length - 1].type === "turn" && guard++ < 50) events = session.act(1);
+    expect(events[events.length - 1].type).toBe("result");
+  });
+
+  it("offers the slider every whole dollar between the limits, plus the presets", () => {
+    expect(raiseStops(150, 520, [260, 999])).toEqual([150, 200, 260, 300, 400, 500, 520]);
+    expect(raiseStops(200, 400, [200, 300])).toEqual([200, 300, 400]);
+    expect(raiseStops(500, 500, [])).toEqual([500]);
   });
 });
 

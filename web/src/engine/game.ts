@@ -80,9 +80,15 @@ export type GameEvent =
   | { type: "board"; cards: string[] }
   | { type: "thinking"; legal: boolean[]; pot: number; to_call: number }
   | { type: "decision"; probs: Record<Action, number>; action: Action; pot: number }
-  | { type: "action"; who: "human"; action: Action; pot: number }
-  | { type: "turn"; obs: Obs; amounts: number[] }
+  | { type: "action"; who: "human"; action: Action; pot: number; to?: number } // to: a raise's street total
+  | { type: "turn"; obs: Obs; amounts: number[]; raise: RaiseRange | null }
   | { type: "result"; human_bb: number; fly_cards: string[]; showdown: boolean; board: string[] };
+
+/** The street totals a person may raise to right now (null: no raise is legal). */
+export interface RaiseRange {
+  min: number;
+  max: number;
+}
 
 export interface SessionOptions {
   greedy?: boolean; // take the fly's most likely action instead of sampling (training samples)
@@ -130,6 +136,16 @@ export class Session {
     return this.advance(events, frames);
   }
 
+  /** The person raises to any legal street total. Returns events up to their next decision (or the end). */
+  raiseTo(to: number, frames: Uint8Array[] = []): GameEvent[] {
+    const h = this.hand;
+    if (!h || h.done || h.actor !== this.humanSeat) throw new Error("not your turn");
+    h.actRaiseTo(to);
+    const action = ACTIONS[h.history[h.history.length - 1][2]];
+    const events: GameEvent[] = [{ type: "action", who: "human", action, pot: h.pot, to }];
+    return this.advance(events, frames);
+  }
+
   private advance(events: GameEvent[], frames: Uint8Array[]): GameEvent[] {
     const h = this.hand!;
     while (true) {
@@ -141,7 +157,8 @@ export class Session {
       const o = h.obs();
       if (o.seat === this.humanSeat) {
         const amounts = o.legal.map((ok, a) => (ok ? h.raiseAmountFor(a) : 0));
-        events.push({ type: "turn", obs: o, amounts });
+        const raise = h.canRaise() ? { min: h.minRaiseTo(), max: h.maxRaiseTo() } : null;
+        events.push({ type: "turn", obs: o, amounts, raise });
         return events;
       }
       events.push({ type: "thinking", legal: o.legal, pot: o.pot, to_call: o.to_call });

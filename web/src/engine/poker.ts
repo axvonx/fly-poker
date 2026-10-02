@@ -176,9 +176,35 @@ export class Hand {
     return this.bets[this.actor!] + this.toCall();
   }
 
+  /** Which of the fly's three raises a raise to `to` reads as (its opponent's-last-move input is
+   *  one of the five actions). A preset's exact amount is that preset, so playing it this way
+   *  writes the same history as act(); any other size goes to half or pot by its fraction of the
+   *  pot, split at the geometric midpoint √½. */
+  raiseBucket(to: number): number {
+    const m = this.legalMask();
+    if (to === this.maxRaiseTo()) return ALLIN;
+    if (m[HALF] && to === this.raiseTo(0.5)) return HALF;
+    if (m[POT] && to === this.raiseTo(1.0)) return POT;
+    const frac = (to - this.maxBet()) / (this.pot + this.toCall());
+    return frac < Math.SQRT1_2 ? HALF : POT;
+  }
+
   // -- acting -------------------------------------------------------------------
   act(action: number): void {
     if (!this.legalMask()[action]) throw new Error(`illegal action ${ACTIONS[action]}`);
+    this.apply(action, action >= HALF ? this.raiseAmountFor(action) : 0);
+  }
+
+  /** A person's raise to any legal street total (in chips), not only the three preset sizes. */
+  actRaiseTo(to: number): void {
+    if (this.finished || this.actor === null || !this.canRaise()) throw new Error("can't raise now");
+    if (!Number.isInteger(to) || to < this.minRaiseTo() || to > this.maxRaiseTo()) {
+      throw new Error(`raise to ${to} is outside ${this.minRaiseTo()}..${this.maxRaiseTo()}`);
+    }
+    this.apply(this.raiseBucket(to), to);
+  }
+
+  private apply(action: number, to: number): void {
     const seat = this.actor!;
     const street = this.street;
     if (action === FOLD) {
@@ -191,7 +217,6 @@ export class Hand {
       this.acted.add(seat);
       this.put(seat, amount);
     } else {
-      const to = action === ALLIN ? this.maxRaiseTo() : this.raiseTo(action === HALF ? 0.5 : 1.0);
       this.raise(seat, to);
     }
     this.history.push([seat, street, action]);
