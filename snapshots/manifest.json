@@ -1,0 +1,58 @@
+{
+  "generated": "2026-10-02T22:25:44-0400",
+  "arms": {
+    "real": {
+      "dim": 1316,
+      "snapshots": [
+        {
+          "hands": 0,
+          "file": "real/h000000000.f32"
+        },
+        {
+          "hands": 10000,
+          "file": "real/h000010000.f32"
+        },
+        {
+          "hands": 20000,
+          "file": "real/h000020000.f32"
+        },
+        {
+          "hands": 40000,
+          "file": "real/h000040000.f32"
+        },
+        {
+          "hands": 60000,
+          "file": "real/h000060000.f32"
+        },
+        {
+          "hands": 90000,
+          "file": "real/h000090000.f32"
+        },
+        {
+          "hands": 130000,
+          "file": "real/h000130000.f32"
+        },
+        {
+          "hands": 200000,
+          "file": "real/h000200000.f32"
+        },
+        {
+          "hands": 320000,
+          "file": "real/h000320000.f32"
+        },
+        {
+          "hands": 490000,
+          "file": "real/h000490000.f32"
+        },
+        {
+          "hands": 750000,
+          "file": "real/h000750000.f32"
+        },
+        {
+          "hands": 1150000,
+          "file": "real/h001150000.f32"
+        }
+      ]
+    }
+  }
+}
